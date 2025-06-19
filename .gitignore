@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+
+# Python backend
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/venv/
+backend/.venv/
+
+# Large model files
+backend/models/*/model.safetensors
+backend/models/*/pytorch_model.bin
+backend/models/*/optimizer.pt
+backend/models/*/scheduler.pt
+backend/models/*/rng_state.pth
+backend/models/*/training_args.bin
+backend/models/*/trainer_state.json
+
+# Keep only config and tokenizer files for models
+!backend/models/*/config.json
+!backend/models/*/tokenizer_config.json
+!backend/models/*/special_tokens_map.json
+!backend/models/*/vocab.txt
+!backend/models/*/tokenizer.json
+!backend/models/*/model_info.json
