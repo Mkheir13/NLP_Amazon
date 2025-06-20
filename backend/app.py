@@ -12,6 +12,7 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import json
 import os
 from datetime import datetime
+from models.embedding_service_basic import EmbeddingServiceBasic
 
 # Télécharger les ressources NLTK nécessaires
 nltk.download('vader_lexicon', quiet=True)
@@ -194,6 +195,7 @@ class NLTKAnalyzer:
 # Instances globales
 bert_trainer = BERTTrainer()
 nltk_analyzer = NLTKAnalyzer()
+embedding_service = EmbeddingServiceBasic()
 
 @app.route('/api/train/bert', methods=['POST'])
 def train_bert():
@@ -315,8 +317,201 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'message': 'Backend NLP opérationnel',
-        'features': ['BERT Training', 'NLTK Analysis']
+        'features': ['BERT Training', 'NLTK Analysis', 'Word Embeddings', 'Semantic Search']
     })
+
+# ========== ENDPOINTS EMBEDDINGS (VERSION BASIQUE TF-IDF) ==========
+
+@app.route('/api/embeddings/train/tfidf', methods=['POST'])
+def train_tfidf():
+    """Entraîne le vectoriseur TF-IDF"""
+    try:
+        data = request.json
+        texts = data.get('texts', [])
+        
+        if not texts:
+            return jsonify({'error': 'Aucun texte fourni pour l\'entraînement'}), 400
+        
+        stats = embedding_service.fit_tfidf(texts)
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'message': 'TF-IDF entraîné avec succès'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/text', methods=['POST'])
+def get_text_embedding():
+    """Obtient l'embedding TF-IDF d'un texte"""
+    try:
+        data = request.json
+        text = data.get('text', '')
+        
+        if not text:
+            return jsonify({'error': 'Aucun texte fourni'}), 400
+        
+        embedding = embedding_service.get_text_embedding(text)
+        
+        return jsonify({
+            'success': True,
+            'text': text,
+            'embedding': embedding.tolist(),
+            'dimension': len(embedding)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/similar', methods=['POST'])
+def find_similar_texts():
+    """Trouve les textes similaires"""
+    try:
+        data = request.json
+        reference_text = data.get('reference_text', '')
+        texts = data.get('texts', [])
+        top_k = data.get('top_k', 10)
+        
+        if not reference_text:
+            return jsonify({'error': 'Aucun texte de référence fourni'}), 400
+        
+        if not texts:
+            return jsonify({'error': 'Aucun texte fourni pour la comparaison'}), 400
+        
+        similar_texts = embedding_service.find_similar_texts(reference_text, texts, top_k)
+        
+        return jsonify({
+            'success': True,
+            'reference_text': reference_text,
+            'similar_texts': similar_texts,
+            'count': len(similar_texts)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/search', methods=['POST'])
+def semantic_search():
+    """Recherche sémantique"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        texts = data.get('texts', [])
+        top_k = data.get('top_k', 5)
+        
+        if not query:
+            return jsonify({'error': 'Aucune requête fournie'}), 400
+        
+        if not texts:
+            return jsonify({'error': 'Aucun texte fourni pour la recherche'}), 400
+        
+        results = embedding_service.semantic_search(query, texts, top_k)
+        
+        return jsonify({
+            'success': True,
+            'query': query,
+            'results': results,
+            'total_searched': len(texts)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/visualize', methods=['POST'])
+def visualize_embeddings():
+    """Visualise les embeddings de textes"""
+    try:
+        data = request.json
+        texts = data.get('texts', [])
+        labels = data.get('labels', None)
+        method = data.get('method', 'pca')
+        
+        if not texts:
+            return jsonify({'error': 'Aucun texte fourni pour la visualisation'}), 400
+        
+        visualization = embedding_service.visualize_text_embeddings(texts, labels, method)
+        
+        return jsonify({
+            'success': True,
+            'visualization': visualization
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/compare', methods=['POST'])
+def compare_texts():
+    """Compare la similarité entre deux textes"""
+    try:
+        data = request.json
+        text1 = data.get('text1', '')
+        text2 = data.get('text2', '')
+        
+        if not text1 or not text2:
+            return jsonify({'error': 'Deux textes sont nécessaires pour la comparaison'}), 400
+        
+        comparison = embedding_service.compare_texts_similarity(text1, text2)
+        
+        return jsonify({
+            'success': True,
+            'comparison': comparison
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/analyze', methods=['POST'])
+def analyze_text_semantics():
+    """Analyse sémantique complète d'un texte"""
+    try:
+        data = request.json
+        text = data.get('text', '')
+        
+        if not text:
+            return jsonify({'error': 'Aucun texte fourni'}), 400
+        
+        analysis = embedding_service.analyze_text_semantics(text)
+        
+        return jsonify({
+            'success': True,
+            'analysis': analysis
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/models', methods=['GET'])
+def get_embedding_models():
+    """Obtient la liste des modèles d'embedding"""
+    try:
+        models = embedding_service.get_available_models()
+        
+        return jsonify({
+            'success': True,
+            'models': models,
+            'count': len(models)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/embeddings/status', methods=['GET'])
+def get_embedding_status():
+    """Vérifie le statut du service d'embedding"""
+    try:
+        available = embedding_service.is_service_available()
+        
+        return jsonify({
+            'success': True,
+            'available': available,
+            'service': 'TF-IDF',
+            'message': 'Service TF-IDF disponible' if available else 'Service non disponible'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Créer les dossiers nécessaires

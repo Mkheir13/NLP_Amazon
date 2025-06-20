@@ -9,10 +9,6 @@ scikit-learn>=1.3.0
 nltk>=3.8.0
 accelerate>=0.24.0
 tensorboard>=2.15.0
-# Embedding dependencies - using specific versions for Windows compatibility
-gensim==4.3.2
+# Embedding dependencies - simplified for Windows
 sentence-transformers==2.2.2
-plotly==5.17.0
-umap-learn==0.5.5
-matplotlib==3.7.2
-seaborn==0.12.2 
+plotly==5.17.0 

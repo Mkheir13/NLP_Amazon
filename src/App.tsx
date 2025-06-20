@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Database, BarChart3, Search, Play, ArrowRight, Github, Sparkles, Zap, ChevronRight, Home, RefreshCw, Target, TrendingUp, Award, Rocket, Globe, Shield, CheckCircle, AlertCircle, Eye, Hash, Clock, FileText, Activity, Download, Copy, Star, ThumbsUp, ThumbsDown, Filter, Shuffle, Settings, Layers, Heart, Minus } from 'lucide-react';
+import { Brain, Database, BarChart3, Search, Play, ArrowRight, Github, Sparkles, Zap, ChevronRight, Home, RefreshCw, Target, TrendingUp, Award, Rocket, Globe, Shield, CheckCircle, AlertCircle, Eye, Hash, Clock, FileText, Activity, Download, Copy, Star, ThumbsUp, ThumbsDown, Filter, Shuffle, Settings, Layers, Heart, Minus, Network } from 'lucide-react';
 import { NLPPipeline } from './components/NLPPipeline';
 import { BERTTraining } from './components/BERTTraining';
+import { EmbeddingHub } from './components/EmbeddingHub';
+import { EmbeddingVisualizer } from './components/EmbeddingVisualizer';
+import { SemanticSearch } from './components/SemanticSearch';
+import { EmbeddingTraining } from './components/EmbeddingTraining';
+import { EmbeddingTrainingSimple } from './components/EmbeddingTrainingSimple';
 import { DatasetLoader, Review } from './services/DatasetLoader';
 import { RealNLPService, RealNLPAnalysis } from './services/RealNLPService';
 
@@ -43,7 +48,11 @@ function App() {
     analyze: 'Analyser Texte',
     training: 'Entraîner Modèles',
     pipeline: 'Pipeline NLP',
-    results: 'Résultats'
+    results: 'Résultats',
+    embeddings_hub: 'Hub Embeddings',
+    embeddings: 'Visualiser Embeddings',
+    semantic_search: 'Recherche Sémantique',
+    embedding_training: 'Entraîner Embeddings'
   };
 
   // Données du dataset Amazon
@@ -279,10 +288,28 @@ function App() {
   const renderHome = () => (
     <div className="text-center space-y-12">
       {/* Hero section avec animation */}
-      <div className="relative">
+      <div className="relative pt-8">
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full blur-3xl opacity-20 animate-pulse"></div>
         <div className="relative">
-          <Brain className="h-32 w-32 text-cyan-400 mx-auto mb-6 animate-bounce" />
+          <div className="flex items-center justify-center space-x-4 mb-6">
+            <Brain className="h-32 w-32 text-cyan-400 animate-bounce" />
+            <div className="text-left">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-sm font-medium border border-cyan-500/30">
+                  v3.0 • Embeddings Ready
+                </span>
+                <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/30">
+                  TF-IDF Intégré
+                </span>
+              </div>
+              <div className="text-4xl md:text-5xl font-bold text-white mb-2">
+                Nouvelle Génération
+              </div>
+              <div className="text-cyan-400 text-lg font-medium">
+                🔗 Embeddings • 🔍 Recherche Sémantique • 📊 Visualisations
+              </div>
+            </div>
+          </div>
           <div className="space-y-4">
             <h1 className="text-6xl md:text-7xl font-bold">
               <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
@@ -292,18 +319,28 @@ function App() {
               <span className="text-white">Analysis</span>
             </h1>
             <p className="text-2xl text-white/80 max-w-4xl mx-auto leading-relaxed">
-              Pipeline NLP révolutionnaire avec analyse émotionnelle avancée et visualisations interactives
+              Pipeline NLP révolutionnaire avec embeddings TF-IDF, recherche sémantique et visualisations interactives
             </p>
-            <div className="flex items-center justify-center space-x-2 text-green-400 text-lg">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="font-medium">IA de nouvelle génération • Temps réel</span>
+            <div className="flex items-center justify-center space-x-6 text-lg">
+              <div className="flex items-center space-x-2 text-green-400">
+                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">IA Émotionnelle</span>
+              </div>
+              <div className="flex items-center space-x-2 text-cyan-400">
+                <div className="w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Embeddings TF-IDF</span>
+              </div>
+              <div className="flex items-center space-x-2 text-purple-400">
+                <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Temps Réel</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Cards principales avec hover effects */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
         <button 
           onClick={() => setCurrentView('explore')}
           className="group relative p-8 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-2xl border border-cyan-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/25 overflow-hidden"
@@ -369,18 +406,102 @@ function App() {
         </button>
       </div>
 
-      {/* Statistiques avec animations */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto">
+      {/* Nouvelle section Embeddings avec design premium */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-xl"></div>
+        <div className="relative bg-slate-800/50 backdrop-blur-xl p-12 rounded-3xl border border-white/10">
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              <div className="relative">
+                <Network className="h-12 w-12 text-indigo-400 animate-pulse" />
+                <div className="absolute inset-0 bg-indigo-400 rounded-full blur-lg opacity-30"></div>
+              </div>
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Embeddings & IA Sémantique
+              </h2>
+              <div className="relative">
+                <Search className="h-12 w-12 text-pink-400 animate-pulse" />
+                <div className="absolute inset-0 bg-pink-400 rounded-full blur-lg opacity-30"></div>
+              </div>
+            </div>
+            <p className="text-white/80 text-xl max-w-4xl mx-auto leading-relaxed">
+              🚀 <strong>Nouveauté v3.0</strong> : Transformez vos textes en vecteurs intelligents avec TF-IDF, 
+              explorez les relations sémantiques et découvrez des insights cachés dans vos données
+            </p>
+            <div className="flex items-center justify-center space-x-6 mt-6">
+              <div className="flex items-center space-x-2 text-indigo-400 bg-indigo-500/20 px-4 py-2 rounded-full border border-indigo-500/30">
+                <Zap className="h-4 w-4" />
+                <span className="font-medium">Vectorisation TF-IDF</span>
+              </div>
+              <div className="flex items-center space-x-2 text-purple-400 bg-purple-500/20 px-4 py-2 rounded-full border border-purple-500/30">
+                <Eye className="h-4 w-4" />
+                <span className="font-medium">Visualisation 2D/3D</span>
+              </div>
+              <div className="flex items-center space-x-2 text-pink-400 bg-pink-500/20 px-4 py-2 rounded-full border border-pink-500/30">
+                <Search className="h-4 w-4" />
+                <span className="font-medium">Recherche Sémantique</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <button 
+              onClick={() => setCurrentView('embeddings_hub')}
+              className="group relative p-6 bg-gradient-to-br from-indigo-500/20 to-purple-600/20 rounded-2xl border border-indigo-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/25 overflow-hidden col-span-3"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
+              <div className="relative text-center">
+                <div className="flex items-center justify-center space-x-4 mb-4">
+                  <Network className="h-12 w-12 text-indigo-400 group-hover:scale-110 transition-transform duration-300" />
+                  <Eye className="h-12 w-12 text-teal-400 group-hover:scale-110 transition-transform duration-300" />
+                  <Search className="h-12 w-12 text-rose-400 group-hover:scale-110 transition-transform duration-300" />
+                </div>
+                <h3 className="text-2xl font-bold mb-3">Hub Embeddings Unifié</h3>
+                <p className="text-indigo-100 text-lg leading-relaxed">
+                  🎯 Tout-en-un : Entraînement TF-IDF, Visualisation 2D et Recherche sémantique dans une seule page fluide
+                </p>
+                <div className="mt-4 flex items-center justify-center space-x-6">
+                  <div className="flex items-center space-x-2 text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
+                    <Network className="h-4 w-4" />
+                    <span className="text-sm font-medium">Entraînement</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-teal-300 bg-teal-500/20 px-3 py-1 rounded-full">
+                    <Eye className="h-4 w-4" />
+                    <span className="text-sm font-medium">Visualisation</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-rose-300 bg-rose-500/20 px-3 py-1 rounded-full">
+                    <Search className="h-4 w-4" />
+                    <span className="text-sm font-medium">Recherche</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-center space-x-2 text-indigo-300">
+                  <span className="text-lg">Accéder au Hub</span>
+                  <ArrowRight className="h-5 w-5 transform group-hover:translate-x-2 transition-transform" />
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Statistiques avec animations - Mise à jour v3.0 */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-6 max-w-6xl mx-auto">
         {[
-          { number: "4M", label: "Avis Amazon", icon: Database, color: "text-cyan-400", bg: "bg-cyan-500/20" },
-          { number: "6", label: "Émotions Détectées", icon: Heart, color: "text-pink-400", bg: "bg-pink-500/20" },
-          { number: "96%", label: "Précision IA", icon: Award, color: "text-yellow-400", bg: "bg-yellow-500/20" },
-          { number: "25ms", label: "Temps Réponse", icon: Zap, color: "text-green-400", bg: "bg-green-500/20" }
+          { number: "4M", label: "Avis Amazon", icon: Database, color: "text-cyan-400", bg: "bg-cyan-500/20", desc: "Dataset réel" },
+          { number: "TF-IDF", label: "Vectorisation", icon: Network, color: "text-indigo-400", bg: "bg-indigo-500/20", desc: "Embeddings" },
+          { number: "2D/3D", label: "Visualisations", icon: Eye, color: "text-purple-400", bg: "bg-purple-500/20", desc: "PCA • t-SNE" },
+          { number: "96%", label: "Précision IA", icon: Award, color: "text-yellow-400", bg: "bg-yellow-500/20", desc: "Sentiment" },
+          { number: "25ms", label: "Temps Réponse", icon: Zap, color: "text-green-400", bg: "bg-green-500/20", desc: "Ultra-rapide" }
         ].map((stat, index) => (
-          <div key={index} className={`${stat.bg} backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:scale-105 transition-all duration-300 group`}>
-            <stat.icon className={`h-10 w-10 ${stat.color} mx-auto mb-4 group-hover:scale-110 transition-transform`} />
-            <div className={`text-4xl font-bold ${stat.color} mb-2`}>{stat.number}</div>
-            <div className="text-white/70 text-sm font-medium">{stat.label}</div>
+          <div key={index} className={`${stat.bg} backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:scale-105 transition-all duration-300 group relative overflow-hidden`}>
+            {/* Effet de brillance au hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+            <div className="relative">
+              <stat.icon className={`h-8 w-8 ${stat.color} mx-auto mb-3 group-hover:scale-110 transition-transform`} />
+              <div className={`text-2xl font-bold ${stat.color} mb-1`}>{stat.number}</div>
+              <div className="text-white/80 text-sm font-medium mb-1">{stat.label}</div>
+              <div className="text-white/50 text-xs">{stat.desc}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -883,54 +1004,89 @@ function App() {
     );
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
-      {/* Header amélioré */}
-      <header className="bg-black/30 backdrop-blur-2xl border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <button 
-              onClick={() => setCurrentView('home')}
-              className="flex items-center space-x-3 hover:opacity-80 transition-opacity group"
-            >
-              <div className="p-2 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-xl group-hover:scale-110 transition-transform">
-                <Brain className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <span className="text-white font-bold text-2xl">NLP Amazon Analysis</span>
-                <div className="text-cyan-400 text-sm font-medium">IA Émotionnelle Avancée</div>
-              </div>
-            </button>
-            
-            <div className="flex items-center space-x-8">
-              <nav className="hidden md:flex space-x-8">
-                {Object.entries(views).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => setCurrentView(key)}
-                    className={`transition-all font-medium ${
-                      currentView === key 
-                        ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' 
-                        : 'text-white/70 hover:text-white hover:scale-105'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </nav>
-              
-              <a 
-                href="https://github.com/Mkheir13/NLP" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-white/70 hover:text-white transition-colors hover:scale-110"
+  // Composant Header uniforme et compact
+  const renderHeader = () => (
+    <header className="bg-slate-900/95 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14">
+          {/* Logo compact */}
+          <button 
+            onClick={() => setCurrentView('home')}
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity group"
+          >
+            <div className="relative">
+              <Brain className="h-6 w-6 text-cyan-400 animate-pulse" />
+              <div className="absolute inset-0 bg-cyan-400 rounded-full blur-md opacity-30"></div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-white">NLP Amazon</span>
+              <span className="text-xs text-cyan-400 font-medium">Analysis Platform</span>
+            </div>
+          </button>
+
+          {/* Navigation principale compacte */}
+          <nav className="hidden md:flex items-center space-x-1">
+            {[
+              { id: 'home', label: 'Accueil', icon: Home },
+              { id: 'explore', label: 'Dataset', icon: Database },
+              { id: 'analyze', label: 'Analyser', icon: Brain },
+              { id: 'training', label: 'Entraîner', icon: Target },
+              { id: 'pipeline', label: 'Pipeline', icon: Layers }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
+                  currentView === item.id
+                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
               >
-                <Github className="h-6 w-6" />
-              </a>
+                <item.icon className="h-4 w-4" />
+                <span className="font-medium">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Menu embeddings compact */}
+          <div className="hidden lg:flex items-center space-x-2">
+            <div className="w-px h-6 bg-white/20"></div>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setCurrentView('embeddings_hub')}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 text-sm ${
+                  currentView === 'embeddings_hub'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    : 'text-indigo-400/70 hover:text-indigo-400 hover:bg-white/5'
+                }`}
+              >
+                <Network className="h-4 w-4" />
+                <span className="font-medium">Hub Embeddings</span>
+              </button>
             </div>
           </div>
+
+          {/* Indicateurs de statut compacts */}
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 px-2 py-1 rounded-full border border-green-500/30">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-xs font-medium">Live</span>
+            </div>
+            {reviews.length > 0 && (
+              <div className="text-white/60 text-xs font-medium">
+                {reviews.length} avis
+              </div>
+            )}
+          </div>
         </div>
-      </header>
+      </div>
+    </header>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+      {/* Header uniforme pour toutes les pages */}
+      {renderHeader()}
 
       {/* Contenu principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -953,22 +1109,22 @@ function App() {
         {currentView === 'training' && renderTraining()}
         {currentView === 'pipeline' && renderPipeline()}
         {currentView === 'results' && renderResults()}
+        {currentView === 'embeddings_hub' && <EmbeddingHub onClose={() => setCurrentView('home')} />}
       </main>
 
-      {/* Footer amélioré */}
-      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Footer simplifié */}
+      <footer className="border-t border-white/10 bg-slate-900/50 backdrop-blur-xl mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <Brain className="h-6 w-6 text-cyan-400" />
-              <span className="text-white/80 text-lg">Pipeline NLP révolutionnaire pour Amazon Polarity</span>
+              <Brain className="h-5 w-5 text-cyan-400" />
+              <span className="text-white/80">Pipeline NLP révolutionnaire • Amazon Polarity Analysis</span>
             </div>
-            <div className="flex items-center space-x-6 text-white/60">
-              <a href="https://github.com/Mkheir13/NLP" className="hover:text-white transition-colors font-medium">GitHub</a>
-              <a href="https://huggingface.co/datasets/mteb/amazon_polarity" className="hover:text-white transition-colors font-medium">Dataset</a>
-              <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 px-3 py-1 rounded-full">
+            <div className="flex items-center space-x-4 text-white/60 text-sm">
+              <span>Dataset: Amazon Polarity</span>
+              <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 px-2 py-1 rounded-full">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium">Système Opérationnel</span>
+                <span className="text-xs font-medium">Système Opérationnel</span>
               </div>
             </div>
           </div>
