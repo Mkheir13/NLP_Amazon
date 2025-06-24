@@ -718,6 +718,106 @@ def load_autoencoder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/autoencoder/extract_all', methods=['POST'])
+def extract_all_encoded_vectors():
+    """Extrait tous les vecteurs compressés du corpus d'entraînement"""
+    try:
+        # Charger le dataset Amazon/polarity
+        from load_amazon_dataset import amazon_loader
+        texts = amazon_loader.load_data(split='all', max_samples=1000)
+        
+        # Extraire tous les vecteurs compressés
+        encoded_vectors = []
+        original_texts = []
+        
+        for text in texts:
+            try:
+                # Encoder chaque texte
+                encoded = autoencoder_service.encode_text(text)
+                encoded_vectors.append(encoded.tolist())
+                original_texts.append(text)
+            except Exception as e:
+                print(f"Erreur encodage texte: {e}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'encoded_vectors': encoded_vectors,
+            'original_texts': original_texts,
+            'count': len(encoded_vectors),
+            'encoding_dim': len(encoded_vectors[0]) if encoded_vectors else 0,
+            'message': f'{len(encoded_vectors)} vecteurs compressés extraits'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/kmeans', methods=['POST'])
+def apply_kmeans_clustering():
+    """Applique KMeans sur les vecteurs compressés"""
+    try:
+        from sklearn.cluster import KMeans
+        from sklearn.metrics import silhouette_score
+        import numpy as np
+        
+        data = request.json
+        encoded_vectors = data.get('encoded_vectors', [])
+        original_texts = data.get('original_texts', [])
+        n_clusters = data.get('n_clusters', 3)
+        
+        if not encoded_vectors:
+            return jsonify({'error': 'Aucun vecteur encodé fourni'}), 400
+        
+        # Convertir en array NumPy
+        X = np.array(encoded_vectors)
+        
+        print(f"🔍 Application de KMeans avec {n_clusters} clusters sur {len(X)} vecteurs...")
+        
+        # Appliquer KMeans
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        cluster_labels = kmeans.fit_predict(X)
+        
+        # Calculer le score de silhouette
+        silhouette_avg = silhouette_score(X, cluster_labels)
+        
+        # Analyser les clusters
+        clusters_analysis = []
+        for i in range(n_clusters):
+            cluster_indices = np.where(cluster_labels == i)[0]
+            cluster_texts = [original_texts[idx] for idx in cluster_indices]
+            cluster_center = kmeans.cluster_centers_[i]
+            
+            # Mots les plus fréquents dans ce cluster
+            cluster_words = []
+            for text in cluster_texts:
+                cluster_words.extend(text.lower().split())
+            
+            from collections import Counter
+            most_common_words = Counter(cluster_words).most_common(10)
+            
+            clusters_analysis.append({
+                'cluster_id': int(i),
+                'size': len(cluster_texts),
+                'texts': cluster_texts[:5],  # Premiers 5 textes
+                'center': cluster_center.tolist(),
+                'most_common_words': most_common_words,
+                'percentage': (len(cluster_texts) / len(original_texts)) * 100
+            })
+        
+        return jsonify({
+            'success': True,
+            'n_clusters': n_clusters,
+            'cluster_labels': cluster_labels.tolist(),
+            'silhouette_score': float(silhouette_avg),
+            'clusters_analysis': clusters_analysis,
+            'cluster_centers': kmeans.cluster_centers_.tolist(),
+            'inertia': float(kmeans.inertia_),
+            'message': f'Clustering réussi avec score silhouette: {silhouette_avg:.3f}'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/dataset/amazon/stats', methods=['GET'])
 def get_amazon_dataset_stats():
     """Obtient les statistiques du dataset Amazon/polarity"""

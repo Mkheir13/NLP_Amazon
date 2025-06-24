@@ -50,6 +50,12 @@ const AutoencoderTraining: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [showCodePopup, setShowCodePopup] = useState(false);
   const [selectedCodeStep, setSelectedCodeStep] = useState<string>('');
+  
+  // États pour le clustering
+  const [clusteringResults, setClusteringResults] = useState<any>(null);
+  const [nClusters, setNClusters] = useState<number>(3);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isClustering, setIsClustering] = useState(false);
 
   const autoencoderDefaults = ConfigManager.getModelDefaults('autoencoder');
   const [config, setConfig] = useState<AutoencoderConfig>({
@@ -775,6 +781,67 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
     }
   };
 
+  const handleExtractAndCluster = async () => {
+    setIsExtracting(true);
+    setIsClustering(true);
+    setError('');
+    
+    try {
+      // Étape 5: Extraire tous les vecteurs compressés
+      setMessage('🔄 Extraction des vecteurs compressés...');
+      
+      const extractResponse = await fetch(`${API_BASE}/extract_all`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!extractResponse.ok) {
+        throw new Error(`HTTP error! status: ${extractResponse.status}`);
+      }
+
+      const extractData = await extractResponse.json();
+      if (!extractData.success) {
+        throw new Error(extractData.error || 'Erreur lors de l\'extraction');
+      }
+
+      setMessage(`✅ ${extractData.count} vecteurs extraits. Application de KMeans...`);
+      setIsExtracting(false);
+
+      // Étape 6: Appliquer KMeans
+      const clusterResponse = await fetch(`${API_BASE}/kmeans`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          encoded_vectors: extractData.encoded_vectors,
+          original_texts: extractData.original_texts,
+          n_clusters: nClusters
+        }),
+      });
+
+      if (!clusterResponse.ok) {
+        throw new Error(`HTTP error! status: ${clusterResponse.status}`);
+      }
+
+      const clusterData = await clusterResponse.json();
+      if (!clusterData.success) {
+        throw new Error(clusterData.error || 'Erreur lors du clustering');
+      }
+
+      setClusteringResults(clusterData);
+      setMessage(`✅ Clustering terminé ! Score silhouette: ${clusterData.silhouette_score.toFixed(3)}`);
+
+    } catch (err) {
+      setError(`Erreur clustering: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } finally {
+      setIsExtracting(false);
+      setIsClustering(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-6xl mx-auto">
@@ -803,6 +870,7 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
             {[
               { id: 'training', label: 'Entraînement', icon: Brain },
               { id: 'testing', label: 'Test', icon: Play },
+              { id: 'clustering', label: 'Clustering', icon: RefreshCw },
               { id: 'search', label: 'Recherche', icon: Search },
               { id: 'info', label: 'Info Modèle', icon: Info }
             ].map((tab) => (
@@ -1078,6 +1146,163 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'clustering' && (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Clustering KMeans</h2>
+                <div className="text-sm text-slate-400">
+                  Étapes 5-7 : Extraction → KMeans → Analyse
+                </div>
+              </div>
+
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 mb-6">
+                <h3 className="text-orange-400 font-medium mb-2">📋 Pipeline de Clustering</h3>
+                <div className="text-slate-300 text-sm space-y-1">
+                  <p><strong>5.</strong> Extraire les vecteurs compressés (X_encoded)</p>
+                  <p><strong>6.</strong> Appliquer KMeans sur ces vecteurs</p>
+                  <p><strong>7.</strong> Analyser les clusters obtenus</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="space-y-2">
+                  <label className="text-white text-sm font-medium">Nombre de clusters</label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="10"
+                    value={nClusters}
+                    onChange={(e) => setNClusters(parseInt(e.target.value))}
+                    className="w-full p-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:outline-none focus:border-orange-400"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={handleExtractAndCluster}
+                    disabled={isClustering}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isClustering ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                        <span>{isExtracting ? 'Extraction...' : 'Clustering...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-5 w-5" />
+                        <span>Lancer Clustering</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {clusteringResults && (
+                <div className="space-y-6">
+                  {/* Métriques globales */}
+                  <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-6">
+                    <h3 className="text-white font-bold text-lg mb-4">📊 Métriques de Clustering</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Score Silhouette</p>
+                        <p className="text-white font-mono text-lg">{clusteringResults.silhouette_score.toFixed(3)}</p>
+                        <p className="text-xs text-slate-400">
+                          {clusteringResults.silhouette_score > 0.5 ? '✅ Excellent' : 
+                           clusteringResults.silhouette_score > 0.3 ? '🟡 Bon' : '❌ Faible'}
+                        </p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Inertie</p>
+                        <p className="text-white font-mono text-lg">{clusteringResults.inertia.toFixed(2)}</p>
+                        <p className="text-xs text-slate-400">Variance intra-cluster</p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Clusters</p>
+                        <p className="text-white font-mono text-lg">{clusteringResults.n_clusters}</p>
+                        <p className="text-xs text-slate-400">Groupes identifiés</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analyse des clusters */}
+                  <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-6">
+                    <h3 className="text-white font-bold text-lg mb-4">🔍 Analyse des Clusters</h3>
+                    <div className="space-y-6">
+                      {clusteringResults.clusters_analysis.map((cluster: any, idx: number) => (
+                        <div key={idx} className="bg-slate-700 rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="text-blue-400 font-medium text-lg">
+                              Cluster {cluster.cluster_id}
+                            </h4>
+                            <div className="flex gap-2">
+                              <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-sm">
+                                {cluster.size} textes
+                              </span>
+                              <span className="bg-slate-600 text-slate-300 px-2 py-1 rounded text-sm">
+                                {cluster.percentage.toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <h5 className="text-slate-300 font-medium mb-2">Exemples de textes:</h5>
+                              <div className="space-y-2">
+                                {cluster.texts.map((text: string, textIdx: number) => (
+                                  <div key={textIdx} className="bg-slate-800 p-2 rounded text-sm text-slate-300">
+                                    {text.length > 100 ? text.substring(0, 100) + '...' : text}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <h5 className="text-slate-300 font-medium mb-2">Mots les plus fréquents:</h5>
+                              <div className="space-y-1">
+                                {cluster.most_common_words.slice(0, 8).map(([word, count]: [string, number], wordIdx: number) => (
+                                  <div key={wordIdx} className="flex justify-between bg-slate-800 p-1 rounded text-sm">
+                                    <span className="text-white">{word}</span>
+                                    <span className="text-blue-400">{count}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interprétation */}
+                  <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-6">
+                    <h3 className="text-white font-bold text-lg mb-4">💡 Interprétation des Résultats</h3>
+                    <div className="space-y-3 text-slate-300">
+                      <p><strong>Que regroupent-ils ?</strong></p>
+                      <ul className="list-disc list-inside space-y-1 ml-4">
+                        {clusteringResults.clusters_analysis.map((cluster: any, idx: number) => {
+                          const topWords = cluster.most_common_words.slice(0, 3).map(([word]: [string, number]) => word);
+                          const sentiment = topWords.some((w: string) => ['excellent', 'great', 'perfect', 'amazing'].includes(w)) ? 'Positif' :
+                                          topWords.some((w: string) => ['terrible', 'awful', 'poor', 'horrible'].includes(w)) ? 'Négatif' : 'Neutre';
+                          
+                          return (
+                            <li key={idx}>
+                              <strong>Cluster {cluster.cluster_id}:</strong> Semble regrouper des avis {sentiment.toLowerCase()} 
+                              (mots-clés: {topWords.join(', ')})
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <p className="mt-4"><strong>Quels mots ressortent ?</strong></p>
+                      <p className="text-sm">
+                        L'autoencoder a appris à comprendre la sémantique des avis Amazon et les regroupe 
+                        selon leur sentiment et leur contenu thématique dans l'espace compressé.
+                      </p>
                     </div>
                   </div>
                 </div>
