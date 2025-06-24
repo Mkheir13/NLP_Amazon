@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Target, Settings, RefreshCw, CheckCircle, AlertCircle, BarChart3, Zap, Brain, Database, Lightbulb } from 'lucide-react';
 import { DatasetLoader, Review } from '../services/DatasetLoader';
+import ConfigManager from '../config/AppConfig';
 
 interface EmbeddingTrainingSimpleProps {
   onClose?: () => void;
@@ -20,7 +21,7 @@ export const EmbeddingTrainingSimple: React.FC<EmbeddingTrainingSimpleProps> = (
   useEffect(() => {
     const checkService = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/embeddings/status');
+        const response = await fetch(`${ConfigManager.getApiUrl('embeddings')}/status`);
         const data = await response.json();
         setServiceAvailable(data.available);
       } catch (error) {
@@ -76,7 +77,7 @@ export const EmbeddingTrainingSimple: React.FC<EmbeddingTrainingSimpleProps> = (
 
       console.log(`🚀 Démarrage entraînement TF-IDF sur ${texts.length} textes...`);
       
-      const response = await fetch('http://localhost:5000/api/embeddings/train/tfidf', {
+      const response = await fetch(`${ConfigManager.getApiUrl('embeddings')}/train/tfidf`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

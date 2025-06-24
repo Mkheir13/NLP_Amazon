@@ -2,6 +2,14 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
+
+# Import de la configuration
+try:
+    from config import config
+    print("✅ Configuration chargée depuis config.py")
+except ImportError:
+    print("⚠️ Fichier config.py non trouvé, utilisation des valeurs par défaut")
+    config = None
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from datasets import Dataset
 import torch
@@ -13,6 +21,7 @@ import json
 import os
 from datetime import datetime
 from models.embedding_service_basic import EmbeddingServiceBasic
+from models.autoencoder_service import AutoencoderService
 
 # Télécharger les ressources NLTK nécessaires
 nltk.download('vader_lexicon', quiet=True)
@@ -20,7 +29,14 @@ nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 
 app = Flask(__name__)
-CORS(app)
+
+# Configuration CORS
+if config:
+    CORS(app, origins=config.CORS_ORIGINS)
+    print(f"✅ CORS configuré pour: {config.CORS_ORIGINS}")
+else:
+    CORS(app)
+    print("⚠️ CORS configuré par défaut")
 
 class BERTTrainer:
     def __init__(self):
@@ -196,6 +212,7 @@ class NLTKAnalyzer:
 bert_trainer = BERTTrainer()
 nltk_analyzer = NLTKAnalyzer()
 embedding_service = EmbeddingServiceBasic()
+autoencoder_service = AutoencoderService(config.get_autoencoder_config() if config else None)
 
 @app.route('/api/train/bert', methods=['POST'])
 def train_bert():
@@ -513,9 +530,258 @@ def get_embedding_status():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ========== ENDPOINTS AUTOENCODER ==========
+
+@app.route('/api/autoencoder/train', methods=['POST'])
+def train_autoencoder():
+    """Entraîne l'autoencoder sur le dataset Amazon/polarity"""
+    try:
+        data = request.json
+        config = data.get('config', {})
+        
+        # Charger le dataset Amazon/polarity
+        print("📂 Chargement du dataset Amazon/polarity...")
+        try:
+            # Importer le loader Amazon/polarity
+            from load_amazon_dataset import amazon_loader
+            
+            # Charger le dataset complet (train + test)
+            extended_texts = amazon_loader.load_data(split='all', max_samples=1000)
+            
+            print(f"✅ Dataset Amazon/polarity chargé: {len(extended_texts)} avis")
+            
+        except Exception as e:
+            print(f"⚠️ Erreur chargement dataset: {e}")
+            # Dataset de fallback Amazon-like
+            extended_texts = [
+                "This product is excellent quality and I love it",
+                "Great value for money highly recommend",
+                "Terrible product completely broken on arrival",
+                "Very poor quality waste of money",
+                "Amazing item exceeded all expectations",
+                "Awful experience poor quality and slow shipping"
+            ]
+        
+        # Entraîner l'autoencoder sur le dataset Amazon
+        result = autoencoder_service.train_autoencoder(extended_texts, config)
+        
+        return jsonify({
+            'success': True,
+            'result': result,
+            'dataset': 'Amazon/polarity',
+            'corpus_size': len(extended_texts),
+            'message': 'Autoencoder entraîné avec succès sur Amazon/polarity'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/encode', methods=['POST'])
+def encode_text():
+    """Encode un texte vers sa représentation compressée"""
+    try:
+        data = request.json
+        text = data.get('text', '')
+        
+        if not text:
+            return jsonify({'error': 'Aucun texte fourni'}), 400
+        
+        encoded = autoencoder_service.encode_text(text)
+        
+        return jsonify({
+            'success': True,
+            'text': text,
+            'encoded': encoded.tolist(),
+            'encoding_dim': len(encoded)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/decode', methods=['POST'])
+def decode_embedding():
+    """Décode une représentation compressée vers l'espace original"""
+    try:
+        data = request.json
+        encoded = data.get('encoded', [])
+        
+        if not encoded:
+            return jsonify({'error': 'Aucun embedding encodé fourni'}), 400
+        
+        decoded = autoencoder_service.decode_embedding(np.array(encoded))
+        
+        return jsonify({
+            'success': True,
+            'encoded': encoded,
+            'decoded': decoded.tolist(),
+            'original_dim': len(decoded)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/reconstruct', methods=['POST'])
+def reconstruct_text():
+    """Reconstruit un texte via l'autoencoder (X → encoded → X)"""
+    try:
+        data = request.json
+        text = data.get('text', '')
+        
+        if not text:
+            return jsonify({'error': 'Aucun texte fourni'}), 400
+        
+        reconstruction = autoencoder_service.reconstruct_text(text)
+        
+        return jsonify({
+            'success': True,
+            'reconstruction': reconstruction
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/search', methods=['POST'])
+def search_compressed_space():
+    """Recherche sémantique dans l'espace compressé"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        top_k = data.get('top_k', 5)
+        
+        if not query:
+            return jsonify({'error': 'Aucune requête fournie'}), 400
+        
+        results = autoencoder_service.find_similar_in_compressed_space(query, top_k)
+        
+        return jsonify({
+            'success': True,
+            'query': query,
+            'results': results,
+            'search_space': 'compressed'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/info', methods=['GET'])
+def get_autoencoder_info():
+    """Obtient les informations sur le modèle autoencoder"""
+    try:
+        info = autoencoder_service.get_model_info()
+        
+        return jsonify({
+            'success': True,
+            'model_info': info
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/save', methods=['POST'])
+def save_autoencoder():
+    """Sauvegarde le modèle autoencoder"""
+    try:
+        data = request.json
+        filename = data.get('filename', f'autoencoder_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+        
+        filepath = autoencoder_service.save_model(filename)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Modèle sauvegardé avec succès',
+            'filepath': filepath
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/autoencoder/load', methods=['POST'])
+def load_autoencoder():
+    """Charge un modèle autoencoder sauvegardé"""
+    try:
+        data = request.json
+        filename = data.get('filename', '')
+        
+        if not filename:
+            return jsonify({'error': 'Nom de fichier requis'}), 400
+        
+        success = autoencoder_service.load_model(filename)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Modèle chargé avec succès'
+            })
+        else:
+            return jsonify({'error': 'Échec du chargement du modèle'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dataset/amazon/stats', methods=['GET'])
+def get_amazon_dataset_stats():
+    """Obtient les statistiques du dataset Amazon/polarity"""
+    try:
+        from load_amazon_dataset import amazon_loader
+        
+        stats = amazon_loader.get_statistics()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'dataset': 'Amazon/polarity'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dataset/amazon/examples', methods=['GET'])
+def get_amazon_dataset_examples():
+    """Obtient des exemples du dataset Amazon/polarity pour l'interface"""
+    try:
+        from load_amazon_dataset import amazon_loader
+        
+        # Paramètres de requête
+        max_samples = request.args.get('max_samples', 30, type=int)
+        random_sample = request.args.get('random', 'true').lower() == 'true'
+        
+        print(f"📂 Chargement d'exemples Amazon/polarity (aléatoire: {random_sample}, max: {max_samples})...")
+        
+        # Charger des exemples du dataset avec sélection aléatoire
+        examples = amazon_loader.load_data(
+            split='all', 
+            max_samples=max_samples,
+            random_sample=random_sample
+        )
+        
+        return jsonify({
+            'success': True,
+            'examples': examples,
+            'count': len(examples),
+            'dataset': 'Amazon/polarity',
+            'random': random_sample,
+            'max_samples': max_samples
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
-    # Créer les dossiers nécessaires
-    os.makedirs('./models', exist_ok=True)
-    os.makedirs('./logs', exist_ok=True)
-    
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    # Configuration du serveur
+    if config:
+        config.create_directories()  # Créer les répertoires nécessaires
+        print(f"🚀 Serveur démarré avec configuration centralisée")
+        print(f"📂 Répertoires: {config.MODELS_DIR}")
+        print(f"🌐 CORS: {config.CORS_ORIGINS}")
+        app.run(
+            debug=config.API_DEBUG,
+            host=config.API_HOST,
+            port=config.API_PORT
+        )
+    else:
+        # Configuration par défaut
+        os.makedirs('./models', exist_ok=True)
+        os.makedirs('./models/embeddings', exist_ok=True)
+        os.makedirs('./logs', exist_ok=True)
+        print("⚠️ Serveur démarré avec configuration par défaut")
+        app.run(debug=True, host='0.0.0.0', port=5000) 

@@ -1,4 +1,5 @@
 import { Review } from './DatasetLoader';
+import ConfigManager from '../config/AppConfig';
 
 export interface BERTTrainingConfig {
   model_name: 'distilbert-base-uncased' | 'bert-base-uncased' | 'roberta-base';
@@ -38,7 +39,7 @@ export interface NLTKResult {
 }
 
 export class BERTTrainingService {
-  private static readonly API_BASE = 'http://localhost:5000/api';
+  private static readonly API_BASE = ConfigManager.getApiUrl('bert').replace('/api/bert', '/api');
 
   // Vérifier si le backend est disponible
   static async checkBackendHealth(): Promise<boolean> {

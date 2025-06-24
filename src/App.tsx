@@ -7,6 +7,8 @@ import { EmbeddingVisualizer } from './components/EmbeddingVisualizer';
 import { SemanticSearch } from './components/SemanticSearch';
 import { EmbeddingTraining } from './components/EmbeddingTraining';
 import { EmbeddingTrainingSimple } from './components/EmbeddingTrainingSimple';
+import AutoencoderTraining from './components/AutoencoderTraining';
+
 import { DatasetLoader, Review } from './services/DatasetLoader';
 import { RealNLPService, RealNLPAnalysis } from './services/RealNLPService';
 
@@ -52,7 +54,8 @@ function App() {
     embeddings_hub: 'Hub Embeddings',
     embeddings: 'Visualiser Embeddings',
     semantic_search: 'Recherche Sémantique',
-    embedding_training: 'Entraîner Embeddings'
+    embedding_training: 'Entraîner Embeddings',
+    autoencoder_training: 'Autoencoder'
   };
 
   // Données du dataset Amazon
@@ -447,7 +450,7 @@ function App() {
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <button 
               onClick={() => setCurrentView('embeddings_hub')}
-              className="group relative p-6 bg-gradient-to-br from-indigo-500/20 to-purple-600/20 rounded-2xl border border-indigo-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/25 overflow-hidden col-span-3"
+              className="group relative p-6 bg-gradient-to-br from-indigo-500/20 to-purple-600/20 rounded-2xl border border-indigo-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/25 overflow-hidden col-span-2"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
               <div className="relative text-center">
@@ -480,7 +483,37 @@ function App() {
                 </div>
               </div>
             </button>
+
+            <button 
+              onClick={() => setCurrentView('autoencoder_training')}
+              className="group relative p-6 bg-gradient-to-br from-orange-500/20 to-red-600/20 rounded-2xl border border-orange-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/25 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
+              <div className="relative text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <Brain className="h-12 w-12 text-orange-400 group-hover:scale-110 transition-transform duration-300" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">🤖 Autoencoder</h3>
+                <p className="text-orange-100 text-sm leading-relaxed mb-4">
+                  Réseau de neurones pour compression intelligente TF-IDF → 32D → TF-IDF
+                </p>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center space-x-2 text-orange-300 bg-orange-500/20 px-2 py-1 rounded-full">
+                    <span>✨ Étapes 3 & 4</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-orange-300 bg-orange-500/20 px-2 py-1 rounded-full">
+                    <span>🔧 X → X Training</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-center space-x-2 text-orange-300">
+                  <span className="text-sm">Entraîner</span>
+                  <ArrowRight className="h-4 w-4 transform group-hover:translate-x-2 transition-transform" />
+                </div>
+              </div>
+            </button>
           </div>
+
+
         </div>
       </div>
 
@@ -1031,7 +1064,8 @@ function App() {
               { id: 'explore', label: 'Dataset', icon: Database },
               { id: 'analyze', label: 'Analyser', icon: Brain },
               { id: 'training', label: 'Entraîner', icon: Target },
-              { id: 'pipeline', label: 'Pipeline', icon: Layers }
+              { id: 'pipeline', label: 'Pipeline', icon: Layers },
+              { id: 'autoencoder_training', label: 'Autoencoder', icon: Brain }
             ].map((item) => (
               <button
                 key={item.id}
@@ -1110,6 +1144,8 @@ function App() {
         {currentView === 'pipeline' && renderPipeline()}
         {currentView === 'results' && renderResults()}
         {currentView === 'embeddings_hub' && <EmbeddingHub onClose={() => setCurrentView('home')} />}
+        {currentView === 'autoencoder_training' && <AutoencoderTraining />}
+
       </main>
 
       {/* Footer simplifié */}

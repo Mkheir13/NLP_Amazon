@@ -58,8 +58,10 @@ export interface SemanticAnalysis {
   semantic_density: number;
 }
 
+import ConfigManager from '../config/AppConfig';
+
 export class EmbeddingService {
-  private static readonly BASE_URL = 'http://localhost:5000/api/embeddings';
+  private static readonly BASE_URL = ConfigManager.getApiUrl('embeddings');
 
   // Entraîner un modèle TF-IDF
   static async trainTFIDF(texts: string[]): Promise<{ stats: any }> {

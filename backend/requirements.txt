@@ -15,4 +15,6 @@ sentence-transformers==2.2.2
 plotly==5.17.0
 umap-learn==0.5.5
 matplotlib==3.7.2
-seaborn==0.12.2 
+seaborn==0.12.2
+# Autoencoder dependencies
+tensorflow>=2.13.0 
