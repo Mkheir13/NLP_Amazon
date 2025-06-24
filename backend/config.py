@@ -20,7 +20,7 @@ class Config:
     # Autoencoder Configuration
     AUTOENCODER_CONFIG = {
         'input_dim': int(os.getenv('AUTOENCODER_INPUT_DIM', 1000)),
-        'encoding_dim': int(os.getenv('AUTOENCODER_ENCODING_DIM', 64)),
+        'encoding_dim': int(os.getenv('AUTOENCODER_ENCODING_DIM', 128)),
         'hidden_layers': [512, 128],  # Peut être configuré via env si nécessaire
         'activation': os.getenv('AUTOENCODER_ACTIVATION', 'relu'),
         'optimizer': os.getenv('AUTOENCODER_OPTIMIZER', 'adam'),

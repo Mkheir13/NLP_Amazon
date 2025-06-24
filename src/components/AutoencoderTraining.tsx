@@ -53,7 +53,7 @@ const AutoencoderTraining: React.FC = () => {
   
   // États pour le clustering
   const [clusteringResults, setClusteringResults] = useState<any>(null);
-  const [nClusters, setNClusters] = useState<number>(3);
+  const [nClusters, setNClusters] = useState<number>(4);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isClustering, setIsClustering] = useState(false);
 
@@ -1285,18 +1285,31 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                     <div className="space-y-3 text-slate-300">
                       <p><strong>Que regroupent-ils ?</strong></p>
                       <ul className="list-disc list-inside space-y-1 ml-4">
-                        {clusteringResults.clusters_analysis.map((cluster: any, idx: number) => {
-                          const topWords = cluster.most_common_words.slice(0, 3).map(([word]: [string, number]) => word);
-                          const sentiment = topWords.some((w: string) => ['excellent', 'great', 'perfect', 'amazing'].includes(w)) ? 'Positif' :
-                                          topWords.some((w: string) => ['terrible', 'awful', 'poor', 'horrible'].includes(w)) ? 'Négatif' : 'Neutre';
-                          
-                          return (
-                            <li key={idx}>
-                              <strong>Cluster {cluster.cluster_id}:</strong> Semble regrouper des avis {sentiment.toLowerCase()} 
-                              (mots-clés: {topWords.join(', ')})
-                            </li>
-                          );
-                        })}
+                                                 {clusteringResults.clusters_analysis.map((cluster: any, idx: number) => {
+                           const topWords = cluster.most_common_words.slice(0, 5).map(([word]: [string, number]) => word);
+                           const positiveWords = ['excellent', 'great', 'perfect', 'amazing', 'outstanding', 'fantastic', 'superb', 'brilliant'];
+                           const negativeWords = ['terrible', 'awful', 'poor', 'horrible', 'disappointing', 'defective', 'broken', 'waste'];
+                           
+                           const positiveCount = topWords.filter((w: string) => positiveWords.includes(w.toLowerCase())).length;
+                           const negativeCount = topWords.filter((w: string) => negativeWords.includes(w.toLowerCase())).length;
+                           
+                           const sentiment = positiveCount > negativeCount ? 'Positif' :
+                                           negativeCount > positiveCount ? 'Négatif' : 'Neutre/Mixte';
+                           
+                           const theme = topWords.includes('service') || topWords.includes('customer') ? 'Service Client' :
+                                        topWords.includes('quality') || topWords.includes('product') ? 'Qualité Produit' :
+                                        topWords.includes('shipping') || topWords.includes('delivery') ? 'Livraison' : 'Général';
+                           
+                           return (
+                             <li key={idx}>
+                               <strong>Cluster {cluster.cluster_id}:</strong> {sentiment} • {theme}
+                               <br />
+                               <span className="text-sm text-slate-400">
+                                 Mots-clés: {topWords.join(', ')} • {cluster.size} avis ({cluster.percentage.toFixed(1)}%)
+                               </span>
+                             </li>
+                           );
+                         })}
                       </ul>
                       <p className="mt-4"><strong>Quels mots ressortent ?</strong></p>
                       <p className="text-sm">
