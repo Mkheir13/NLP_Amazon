@@ -14,17 +14,56 @@ export class DatasetLoader {
   private static readonly DATASET_URL = 'https://datasets-server.huggingface.co/rows?dataset=amazon_polarity&config=amazon_polarity&split=train';
   private static readonly SAMPLE_SIZE = 1000; // Limiter à 1000 avis pour les performances
 
-  static async loadAmazonPolarityDataset(sampleSize: number = this.SAMPLE_SIZE): Promise<Review[]> {
+  static async loadAmazonPolarityDataset(sampleSize: number = this.SAMPLE_SIZE, randomSample: boolean = false): Promise<Review[]> {
     try {
-      console.log('Chargement du dataset Amazon Polarity (simulation)...');
+      console.log(`🚀 Chargement du dataset Amazon Polarity COMPLET: ${sampleSize.toLocaleString()} avis...`);
       
-      // Utiliser directement les données simulées pour éviter les problèmes d'API
-      console.log('Utilisation de données simulées basées sur le dataset Amazon Polarity...');
-      return this.generateFallbackData(sampleSize);
+      // Essayer de charger depuis le backend avec le dataset complet
+      try {
+        const response = await fetch('http://localhost:5000/api/dataset/amazon', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            max_samples: sampleSize,
+            random_sample: randomSample,
+            split: 'all',
+            use_full_dataset: true  // Demander explicitement le dataset complet
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Dataset COMPLET chargé depuis le backend: ${data.samples?.length || 0} avis`);
+          
+          if (data.samples && Array.isArray(data.samples)) {
+            return data.samples.map((item: any, index: number) => ({
+              id: index + 1,
+              text: item.text,
+              label: item.label === 2 ? 1 : 0, // Convertir 2->1 (positif), 1->0 (négatif)
+              sentiment: item.label === 2 ? 'positive' : 'negative',
+              title: item.title || `Review #${index + 1}`,
+              rating: item.label === 2 ? Math.floor(Math.random() * 2) + 4 : Math.floor(Math.random() * 2) + 1,
+              category: this.getRandomCategory(),
+              date: this.getRandomDate(),
+              intensity: this.calculateIntensity(item.text)
+            }));
+          }
+        } else {
+          console.warn('⚠️ Backend non disponible ou dataset complet non téléchargé');
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Erreur backend, fallback vers données simulées:', backendError);
+      }
+      
+      // Fallback vers les données simulées étendues
+      console.log('🔄 Utilisation de données simulées étendues (fallback)...');
+      return this.generateFallbackData(sampleSize, randomSample);
 
     } catch (error) {
-      console.error('Erreur lors du chargement du dataset:', error);
-      return this.generateFallbackData(sampleSize);
+      console.error('❌ Erreur lors du chargement du dataset:', error);
+      return this.generateFallbackData(sampleSize, randomSample);
     }
   }
 
@@ -66,8 +105,8 @@ export class DatasetLoader {
     return count > 0 ? intensity / count : Math.random() * 0.4 - 0.2;
   }
 
-  private static generateFallbackData(sampleSize: number): Review[] {
-    console.log('Génération de données de fallback...');
+  private static generateFallbackData(sampleSize: number, randomSample: boolean = false): Review[] {
+    console.log(`Génération de données de fallback: ${sampleSize} avis...`);
     
     const reviewTemplates = [
       // Positifs
@@ -103,6 +142,14 @@ export class DatasetLoader {
         date: this.getRandomDate(),
         intensity: template.intensity
       });
+    }
+
+    // Mélanger si échantillonnage aléatoire demandé
+    if (randomSample) {
+      for (let i = fallbackData.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [fallbackData[i], fallbackData[j]] = [fallbackData[j], fallbackData[i]];
+      }
     }
 
     return fallbackData;

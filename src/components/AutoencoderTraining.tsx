@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Play, Save, Upload, Info, Search, RefreshCw, CheckCircle, AlertCircle, Code, X, Shuffle } from 'lucide-react';
+import { Brain, Play, Save, Upload, Info, Search, RefreshCw, CheckCircle, AlertCircle, Code, X, Shuffle, Database } from 'lucide-react';
 import ConfigManager from '../config/AppConfig';
 
 interface AutoencoderConfig {
@@ -56,6 +56,29 @@ const AutoencoderTraining: React.FC = () => {
   const [nClusters, setNClusters] = useState<number>(4);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isClustering, setIsClustering] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizationResults, setOptimizationResults] = useState<any>(null);
+  
+  // États pour les nouvelles fonctionnalités avancées
+  const [evaluationResults, setEvaluationResults] = useState<any>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [useOptimizedTraining, setUseOptimizedTraining] = useState(true);
+  const [advancedResults, setAdvancedResults] = useState<any>(null);
+  const [isAdvancedAnalysis, setIsAdvancedAnalysis] = useState(false);
+  const [modelToSave, setModelToSave] = useState<string>('');
+  const [modelToLoad, setModelToLoad] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // États pour l'entraînement régularisé (techniques avancées)
+  const [isTrainingRegularized, setIsTrainingRegularized] = useState(false);
+  const [regularizedResults, setRegularizedResults] = useState<any>(null);
+  
+  // États pour la configuration du dataset
+  const [datasetSize, setDatasetSize] = useState<number>(5000);
+  const [maxDatasetSize, setMaxDatasetSize] = useState<number>(3600000); // 3.6M échantillons disponibles
+  const [useRandomSample, setUseRandomSample] = useState<boolean>(true);
+  const [useAmazonDataset, setUseAmazonDataset] = useState<boolean>(true);
 
   const autoencoderDefaults = ConfigManager.getModelDefaults('autoencoder');
   const [config, setConfig] = useState<AutoencoderConfig>({
@@ -723,33 +746,33 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
   const loadSampleTexts = async (randomize: boolean = false) => {
     try {
       setIsTraining(true);
-      setMessage(`🔄 Chargement du dataset Amazon/polarity ${randomize ? '(aléatoire)' : ''}...`);
+      setMessage(`🔄 Chargement de ${datasetSize} avis Amazon/polarity ${randomize ? '(aléatoire)' : ''}...`);
       
-      // Paramètres de requête
-      const maxSamples = randomize ? 50 : 30; // Plus d'exemples en mode aléatoire
-      const url = `${ConfigManager.getApiUrl('dataset')}/amazon/examples?max_samples=${maxSamples}&random=${randomize}`;
+      if (useAmazonDataset) {
+        // Charger depuis le nouveau endpoint avec paramètres configurables
+        const response = await fetch('/api/dataset/amazon', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            max_samples: datasetSize,
+            random_sample: randomize || useRandomSample,
+            split: 'all'
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.reviews) {
+            const texts = data.reviews.map((review: any) => review.text);
+            setTrainingTexts(texts.join('\n'));
+            setMessage(`✅ ${data.reviews.length} avis Amazon/polarity chargés ${randomize || useRandomSample ? '(aléatoire)' : ''}`);
+            return;
+          }
+        }
+      }
       
-      // Charger les exemples depuis le dataset Amazon/polarity
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.success && data.examples) {
-        setTrainingTexts(data.examples.join('\n'));
-        setMessage(`✅ ${data.examples.length} avis Amazon/polarity chargés ${randomize ? '(aléatoire)' : ''}`);
-      } else {
-        throw new Error(data.error || 'Erreur lors du chargement des exemples');
-      }
-    } catch (error) {
-      console.error('Erreur chargement exemples:', error);
       // Fallback vers des exemples Amazon locaux
       const fallbackExamples = [
         "This product is absolutely fantastic and exceeded all my expectations",
@@ -772,10 +795,13 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
         "Poor value for money overpriced and low quality",
         "Horrible product quality control issues evident",
         "Very disappointing purchase not worth the price"
-      ].join('\n');
+      ].slice(0, Math.min(datasetSize, 20));
       
-      setTrainingTexts(fallbackExamples);
-      setMessage('⚠️ Exemples Amazon/polarity de fallback chargés (20 avis)');
+      setTrainingTexts(fallbackExamples.join('\n'));
+      setMessage(`⚠️ Exemples Amazon/polarity de fallback chargés (${fallbackExamples.length} avis)`);
+    } catch (error) {
+      console.error('Erreur chargement exemples:', error);
+      setMessage('❌ Erreur lors du chargement du dataset');
     } finally {
       setIsTraining(false);
     }
@@ -842,6 +868,230 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
     }
   };
 
+  const handleOptimizeClusters = async () => {
+    setIsOptimizing(true);
+    setError('');
+    
+    try {
+      // Utiliser le nouvel endpoint d'optimisation avancée
+      const response = await fetch(`${API_BASE}/optimize_clusters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_clusters: 10,
+          use_compressed: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'optimisation');
+      }
+
+      const data = await response.json();
+      setOptimizationResults(data.result);
+      setNClusters(data.result.recommended_k);
+      setMessage(`Optimisation terminée. k recommandé: ${data.result.recommended_k} (${data.result.recommendation_reason})`);
+
+    } catch (err: any) {
+      setError(`Erreur optimisation: ${err.message}`);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  // Nouvelles fonctions pour les fonctionnalités avancées
+  const handleTrainOptimized = async () => {
+    setIsTraining(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE}/train_optimized`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'entraînement optimisé');
+      }
+
+      const data = await response.json();
+      setTrainingResult(data.result);
+      setMessage('Entraînement optimisé terminé avec succès !');
+      await loadModelInfo();
+
+    } catch (err: any) {
+      setError(`Erreur entraînement optimisé: ${err.message}`);
+    } finally {
+      setIsTraining(false);
+    }
+  };
+
+  const handleEvaluateModel = async () => {
+    setIsEvaluating(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE}/evaluate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'évaluation');
+      }
+
+      const data = await response.json();
+      setEvaluationResults(data.evaluation);
+      setMessage(`Évaluation terminée. Qualité: ${data.evaluation.quality_level} (${data.evaluation.quality_score.toFixed(3)})`);
+
+    } catch (err: any) {
+      setError(`Erreur évaluation: ${err.message}`);
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
+  const handleAdvancedAnalysis = async () => {
+    setIsAdvancedAnalysis(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE}/clustering_advanced`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          n_clusters: nClusters,
+          use_compressed: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'analyse avancée');
+      }
+
+      const data = await response.json();
+      setAdvancedResults(data.result);
+      setMessage('Analyse avancée terminée avec succès !');
+
+    } catch (err: any) {
+      setError(`Erreur analyse avancée: ${err.message}`);
+    } finally {
+      setIsAdvancedAnalysis(false);
+    }
+  };
+
+  const handleSaveModel = async () => {
+    if (!modelToSave.trim()) {
+      setError('Veuillez entrer un nom pour le modèle');
+      return;
+    }
+
+    setIsSaving(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: modelToSave })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la sauvegarde');
+      }
+
+      const data = await response.json();
+      setMessage(`Modèle sauvegardé: ${data.filepath}`);
+      setModelToSave('');
+
+    } catch (err: any) {
+      setError(`Erreur sauvegarde: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadModel = async () => {
+    if (!modelToLoad.trim()) {
+      setError('Veuillez entrer un nom de modèle à charger');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE}/load`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: modelToLoad })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors du chargement');
+      }
+
+      const data = await response.json();
+      setMessage('Modèle chargé avec succès !');
+      setModelToLoad('');
+      await loadModelInfo();
+
+    } catch (err: any) {
+      setError(`Erreur chargement: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 🎯 NOUVELLE FONCTION: Entraînement avec régularisation avancée
+  const handleTrainRegularized = async () => {
+    setIsTrainingRegularized(true);
+    setError('');
+    setMessage('');
+    setRegularizedResults(null);
+
+    try {
+      setMessage('🎯 Démarrage entraînement REGULARISE avec techniques avancées...');
+      
+      const response = await fetch(`${API_BASE}/train_regularized`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          config: {
+            ...config,
+            // Paramètres de régularisation avancés
+            l2_regularization: 0.001,
+            dropout_rates: [0.1, 0.2, 0.3],
+            use_batch_norm: true,
+            early_stopping_patience: 15,
+            reduce_lr_on_plateau: true
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setRegularizedResults(data.result);
+        setMessage(`🎓 Entraînement REGULARISE terminé avec succès! ${data.advanced_validation}`);
+        await loadModelInfo(); // Recharger les infos du modèle
+      } else {
+        setError(data.error || 'Erreur lors de l\'entraînement régularisé');
+      }
+    } catch (err) {
+      setError('Erreur réseau lors de l\'entraînement régularisé');
+    } finally {
+      setIsTrainingRegularized(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-6xl mx-auto">
@@ -871,6 +1121,7 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
               { id: 'training', label: 'Entraînement', icon: Brain },
               { id: 'testing', label: 'Test', icon: Play },
               { id: 'clustering', label: 'Clustering', icon: RefreshCw },
+              { id: 'advanced', label: 'Avancé', icon: CheckCircle },
               { id: 'search', label: 'Recherche', icon: Search },
               { id: 'info', label: 'Info Modèle', icon: Info }
             ].map((tab) => (
@@ -961,6 +1212,95 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                 </div>
               </div>
 
+              {/* Configuration du Dataset */}
+              <div className="bg-slate-700/50 rounded-xl p-6 mb-6">
+                <h3 className="text-white font-medium mb-4 flex items-center">
+                  <Database className="h-5 w-5 mr-2 text-orange-400" />
+                  Configuration du Dataset Amazon
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Sélection de la taille */}
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Nombre d'avis: {datasetSize.toLocaleString()}
+                    </label>
+                    <input
+                      type="range"
+                      min="100"
+                      max={maxDatasetSize}
+                      step="100"
+                      value={datasetSize}
+                      onChange={(e) => setDatasetSize(parseInt(e.target.value))}
+                      className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-slate-400 mt-1">
+                      <span>100</span>
+                      <span>1K</span>
+                      <span>3K</span>
+                      <span>{maxDatasetSize.toLocaleString()}</span>
+                    </div>
+                    
+                    {/* Boutons de sélection rapide */}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {[100, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, maxDatasetSize].map(size => (
+                        <button
+                          key={size}
+                          onClick={() => setDatasetSize(size)}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                            datasetSize === size
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                          }`}
+                        >
+                          {size >= 1000000 ? `${(size/1000000).toFixed(1)}M` : size >= 1000 ? `${(size/1000)}K` : size.toString()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Options */}
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Options de chargement
+                    </label>
+                    <div className="space-y-3">
+                      <label className="flex items-center text-white text-sm">
+                        <input
+                          type="checkbox"
+                          checked={useAmazonDataset}
+                          onChange={(e) => setUseAmazonDataset(e.target.checked)}
+                          className="rounded border-slate-400 text-orange-500 focus:ring-orange-500 mr-2"
+                        />
+                        Utiliser le dataset Amazon
+                      </label>
+                      
+                      <label className="flex items-center text-white text-sm">
+                        <input
+                          type="checkbox"
+                          checked={useRandomSample}
+                          onChange={(e) => setUseRandomSample(e.target.checked)}
+                          className="rounded border-slate-400 text-orange-500 focus:ring-orange-500 mr-2"
+                        />
+                        Échantillonnage aléatoire
+                      </label>
+                    </div>
+                    
+                    {/* Conseils */}
+                    <div className="text-xs text-slate-400 bg-slate-600/30 p-3 rounded-lg mt-3">
+                      <p className="font-medium mb-1">💡 Conseils d'utilisation:</p>
+                      <ul className="space-y-1">
+                        <li>• <strong>100-1K:</strong> Tests rapides et prototypage</li>
+                        <li>• <strong>5K-10K:</strong> Entraînement équilibré</li>
+                        <li>• <strong>50K-100K:</strong> Haute qualité (temps modéré)</li>
+                        <li>• <strong>500K+:</strong> Performance maximale (très lent)</li>
+                        <li>• <strong>3.6M:</strong> Dataset complet (plusieurs heures)</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <label className="text-white text-sm font-medium">Textes d'entraînement (un par ligne)</label>
@@ -977,7 +1317,7 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                         </>
                       ) : (
                         <>
-                          <span>🛒 Charger Amazon/Polarity</span>
+                          <span>🛒 Charger {datasetSize.toLocaleString()} avis</span>
                         </>
                       )}
                     </button>
@@ -985,7 +1325,7 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                       onClick={() => loadSampleTexts(true)}
                       disabled={isTraining}
                       className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center space-x-2"
-                      title="Charger de nouveaux exemples aléatoires (50 avis)"
+                      title="Charger de nouveaux exemples aléatoires"
                     >
                       <Shuffle className="h-4 w-4" />
                       <span>Aléatoire</span>
@@ -1007,23 +1347,76 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                 </div>
               </div>
 
-              <button
-                onClick={handleTrainAutoencoder} 
-                disabled={isTraining}
-                className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-              >
-                {isTraining ? (
-                  <>
-                    <RefreshCw className="h-5 w-5 animate-spin" />
-                    <span>Entraînement en cours...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-5 w-5" />
-                    <span>Entraîner l'Autoencoder</span>
-                  </>
-                )}
-              </button>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4 mb-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={useOptimizedTraining}
+                      onChange={(e) => setUseOptimizedTraining(e.target.checked)}
+                      className="w-4 h-4 text-orange-600 bg-slate-700 border-slate-600 rounded focus:ring-orange-500"
+                    />
+                    <span className="text-white text-sm">Utiliser l'entraînement optimisé (recommandé)</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <button
+                    onClick={useOptimizedTraining ? handleTrainOptimized : handleTrainAutoencoder} 
+                    disabled={isTraining || isTrainingRegularized}
+                    className="px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isTraining ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                        <span>Entraînement...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-5 w-5" />
+                        <span>{useOptimizedTraining ? 'Entraînement Optimisé' : 'Entraînement Standard'}</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleTrainRegularized}
+                    disabled={isTraining || isTrainingRegularized}
+                    className="px-6 py-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 border-2 border-purple-400/50"
+                    title="🎓 Techniques avancées: L2 + Dropout + Batch Norm + Early Stopping + LR Scheduling"
+                  >
+                    {isTrainingRegularized ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                        <span>Régularisation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="h-5 w-5" />
+                        <span>🎓 Entraînement REGULARISE</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleEvaluateModel}
+                    disabled={isEvaluating || !modelInfo?.is_trained}
+                    className="px-6 py-4 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isEvaluating ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                        <span>Évaluation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Évaluer Qualité</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
 
               {trainingResult && (
                 <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-6">
@@ -1049,6 +1442,148 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                       <p className="text-white font-mono">{trainingResult.reconstruction_error?.toFixed(4)}</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {evaluationResults && (
+                <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-6">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <CheckCircle className="h-6 w-6 text-blue-400" />
+                    <h3 className="text-white font-bold text-lg">Évaluation de la Qualité</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">Qualité Globale</p>
+                      <p className="text-white font-mono text-lg">{evaluationResults.quality_level}</p>
+                      <p className="text-blue-400 font-mono text-sm">Score: {evaluationResults.quality_score.toFixed(3)}</p>
+                    </div>
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">MSE</p>
+                      <p className="text-white font-mono">{evaluationResults.mse.toFixed(4)}</p>
+                    </div>
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">Similarité Moyenne</p>
+                      <p className="text-white font-mono">{(evaluationResults.mean_similarity * 100).toFixed(1)}%</p>
+                    </div>
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">Variance Expliquée</p>
+                      <p className="text-white font-mono">{(evaluationResults.variance_explained * 100).toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {regularizedResults && (
+                <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-6">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Brain className="h-6 w-6 text-purple-400" />
+                    <h3 className="text-white font-bold text-lg">🎓 Résultats Entraînement REGULARISE</h3>
+                  </div>
+                  
+                  {/* Validation des techniques avancées */}
+                  <div className="bg-purple-600/20 border border-purple-400/30 rounded-lg p-4 mb-6">
+                    <p className="text-purple-300 font-medium mb-2">✅ Techniques avancées implémentées :</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                              {regularizedResults.advanced_techniques_implemented?.map((technique: string, idx: number) => (
+                        <div key={idx} className="text-purple-200">{technique}</div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Métriques d'entraînement */}
+                  {regularizedResults.training && (
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Framework</p>
+                        <p className="text-white font-mono">{regularizedResults.training.framework}</p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Perte finale</p>
+                        <p className="text-white font-mono">{regularizedResults.training.final_loss?.toFixed(6)}</p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Perte validation</p>
+                        <p className="text-white font-mono">{regularizedResults.training.final_val_loss?.toFixed(6)}</p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Ratio Overfitting</p>
+                        <p className="text-white font-mono">
+                          {regularizedResults.training.overfitting_ratio?.toFixed(3)}
+                          {regularizedResults.training.overfitting_ratio < 1.2 ? ' ✅' : ' ⚠️'}
+                        </p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Epochs utilisés</p>
+                        <p className="text-white font-mono">
+                          {regularizedResults.training.epochs_trained}/{regularizedResults.training.epochs_max}
+                        </p>
+                      </div>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-sm">Early Stopping</p>
+                        <p className="text-white font-mono">
+                          {regularizedResults.training.regularization_effectiveness?.early_stopping_triggered ? '✅ Activé' : '❌ Non activé'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Paramètres de régularisation */}
+                  {regularizedResults.regularization_summary && (
+                    <div className="bg-slate-700/50 p-4 rounded-lg mb-4">
+                      <h4 className="text-purple-400 font-medium mb-3">Paramètres de Régularisation</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-slate-400">L2 Regularization (kernel)</p>
+                          <p className="text-white font-mono">{regularizedResults.regularization_summary.l2_kernel_regularization}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">L2 Regularization (bias)</p>
+                          <p className="text-white font-mono">{regularizedResults.regularization_summary.l2_bias_regularization}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Dropout Rates</p>
+                          <p className="text-white font-mono">[{regularizedResults.regularization_summary.dropout_rates?.join(', ')}]</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Batch Normalization</p>
+                          <p className="text-white font-mono">{regularizedResults.regularization_summary.batch_normalization ? '✅ Activé' : '❌ Désactivé'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Early Stopping Patience</p>
+                          <p className="text-white font-mono">{regularizedResults.regularization_summary.early_stopping_patience}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">LR Scheduling</p>
+                          <p className="text-white font-mono">{regularizedResults.regularization_summary.lr_scheduling ? '✅ Activé' : '❌ Désactivé'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Architecture */}
+                  {regularizedResults.architecture && (
+                    <div className="bg-slate-700/50 p-4 rounded-lg">
+                      <h4 className="text-purple-400 font-medium mb-3">Architecture Régularisée</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-slate-400">Input → Encoding</p>
+                          <p className="text-white font-mono">{regularizedResults.architecture.input_dim} → {regularizedResults.architecture.encoding_dim}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Compression Ratio</p>
+                          <p className="text-white font-mono">{regularizedResults.architecture.compression_ratio?.toFixed(1)}:1</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Paramètres totaux</p>
+                          <p className="text-white font-mono">{regularizedResults.architecture.total_params?.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Techniques appliquées</p>
+                          <p className="text-green-400 font-mono text-xs">{regularizedResults.architecture.advanced_requirements}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1171,7 +1706,7 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="space-y-2">
                   <label className="text-white text-sm font-medium">Nombre de clusters</label>
                   <input
@@ -1185,8 +1720,26 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                 </div>
                 <div className="flex items-end">
                   <button
+                    onClick={handleOptimizeClusters}
+                    disabled={isOptimizing || isClustering}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isOptimizing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <span>Optimisation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🎯 Auto-Optimiser</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="flex items-end">
+                  <button
                     onClick={handleExtractAndCluster}
-                    disabled={isClustering}
+                    disabled={isClustering || isOptimizing}
                     className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                   >
                     {isClustering ? (
@@ -1203,6 +1756,26 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                   </button>
                 </div>
               </div>
+
+              {optimizationResults && (
+                <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 mb-6">
+                  <h3 className="text-green-400 font-medium mb-2">🎯 Résultats d'optimisation</h3>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-400">Meilleur k (Silhouette)</p>
+                      <p className="text-white font-mono">{optimizationResults.best_k_silhouette}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Score Silhouette</p>
+                      <p className="text-white font-mono">{optimizationResults.best_silhouette_score.toFixed(3)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Recommandation</p>
+                      <p className="text-green-400 font-mono">k = {optimizationResults.recommendation}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {clusteringResults && (
                 <div className="space-y-6">
@@ -1318,6 +1891,263 @@ corpus = ${JSON.stringify(trainingTexts.split('\n').slice(0, 5))}
                       </p>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'advanced' && (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Fonctionnalités Avancées</h2>
+                <div className="text-sm text-slate-400">
+                  🔬 Data Science - Niveau M1
+                </div>
+              </div>
+
+              {/* Section Analyse Avancée */}
+              <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-xl p-6">
+                <h3 className="text-purple-400 font-bold text-lg mb-4">🔬 Analyse Avancée du Clustering</h3>
+                <p className="text-slate-300 text-sm mb-4">
+                  Analyse complète avec métriques avancées, identification des thèmes et sentiment analysis automatique.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-white text-sm font-medium">Nombre de clusters</label>
+                    <input
+                      type="number"
+                      min="2"
+                      max="10"
+                      value={nClusters}
+                      onChange={(e) => setNClusters(parseInt(e.target.value))}
+                      className="w-full p-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:outline-none focus:border-purple-400"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleAdvancedAnalysis}
+                      disabled={isAdvancedAnalysis || !modelInfo?.is_trained}
+                      className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {isAdvancedAnalysis ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 animate-spin" />
+                          <span>Analyse...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-5 w-5" />
+                          <span>Analyse Complète</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {advancedResults && (
+                  <div className="mt-6 space-y-4">
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <h4 className="text-purple-400 font-medium mb-2">📊 Métriques Avancées</h4>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-slate-400">Silhouette Score</p>
+                          <p className="text-white font-mono">{advancedResults.silhouette_score?.toFixed(3)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Calinski-Harabasz</p>
+                          <p className="text-white font-mono">{advancedResults.calinski_harabasz?.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">Davies-Bouldin</p>
+                          <p className="text-white font-mono">{advancedResults.davies_bouldin?.toFixed(3)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section Sauvegarde/Chargement */}
+              <div className="bg-gradient-to-r from-green-500/10 to-teal-500/10 border border-green-500/20 rounded-xl p-6">
+                <h3 className="text-green-400 font-bold text-lg mb-4">💾 Gestion des Modèles</h3>
+                <p className="text-slate-300 text-sm mb-4">
+                  Sauvegardez et chargez vos modèles entraînés pour une utilisation ultérieure.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="text-green-400 font-medium">Sauvegarder le modèle</h4>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Nom du modèle (ex: autoencoder_v1)"
+                        value={modelToSave}
+                        onChange={(e) => setModelToSave(e.target.value)}
+                        className="w-full p-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-green-400"
+                      />
+                      <button
+                        onClick={handleSaveModel}
+                        disabled={isSaving || !modelInfo?.is_trained}
+                        className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            <span>Sauvegarde...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4" />
+                            <span>Sauvegarder</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-green-400 font-medium">Charger un modèle</h4>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Nom du modèle à charger"
+                        value={modelToLoad}
+                        onChange={(e) => setModelToLoad(e.target.value)}
+                        className="w-full p-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-green-400"
+                      />
+                      <button
+                        onClick={handleLoadModel}
+                        disabled={isLoading}
+                        className="w-full px-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                      >
+                        {isLoading ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            <span>Chargement...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            <span>Charger</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section Métriques Détaillées */}
+              {evaluationResults && (
+                <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-xl p-6">
+                  <h3 className="text-blue-400 font-bold text-lg mb-4">📈 Métriques Détaillées</h3>
+                  
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="text-blue-400 font-medium">Qualité de Reconstruction</h4>
+                      <div className="space-y-3">
+                        <div className="bg-slate-700 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-sm">MSE (Mean Squared Error)</span>
+                            <span className="text-white font-mono">{evaluationResults.mse?.toFixed(4)}</span>
+                          </div>
+                        </div>
+                        <div className="bg-slate-700 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-sm">MAE (Mean Absolute Error)</span>
+                            <span className="text-white font-mono">{evaluationResults.mae?.toFixed(4)}</span>
+                          </div>
+                        </div>
+                        <div className="bg-slate-700 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-sm">RMSE (Root Mean Squared Error)</span>
+                            <span className="text-white font-mono">{evaluationResults.rmse?.toFixed(4)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-blue-400 font-medium">Analyse Sémantique</h4>
+                      <div className="space-y-3">
+                        <div className="bg-slate-700 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-sm">Similarité Cosinus Moyenne</span>
+                            <span className="text-white font-mono">{(evaluationResults.mean_similarity * 100)?.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="bg-slate-700 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-sm">Variance Expliquée</span>
+                            <span className="text-white font-mono">{(evaluationResults.variance_explained * 100)?.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="bg-slate-700 p-3 rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-sm">Score de Qualité Global</span>
+                            <span className={`font-mono ${
+                              evaluationResults.quality_score > 0.7 ? 'text-green-400' :
+                              evaluationResults.quality_score > 0.4 ? 'text-yellow-400' : 'text-red-400'
+                            }`}>
+                              {evaluationResults.quality_score?.toFixed(3)} ({evaluationResults.quality_level})
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section Optimisation */}
+              {optimizationResults && (
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-6">
+                  <h3 className="text-yellow-400 font-bold text-lg mb-4">🎯 Résultats d'Optimisation</h3>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">Méthode du Coude</p>
+                      <p className="text-white font-mono text-lg">k = {optimizationResults.elbow_k}</p>
+                      <p className="text-xs text-slate-400">Point d'inflexion optimal</p>
+                    </div>
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">Meilleur Silhouette</p>
+                      <p className="text-white font-mono text-lg">k = {optimizationResults.recommended_k}</p>
+                      <p className="text-xs text-slate-400">Score: {optimizationResults.best_silhouette_score?.toFixed(3)}</p>
+                    </div>
+                    <div className="bg-slate-700 p-4 rounded-lg">
+                      <p className="text-slate-400 text-sm">Recommandation</p>
+                      <p className="text-yellow-400 font-mono text-lg">k = {optimizationResults.recommended_k}</p>
+                      <p className="text-xs text-slate-400">{optimizationResults.recommendation_reason}</p>
+                    </div>
+                  </div>
+
+                  {optimizationResults.scores && (
+                    <div className="mt-4">
+                      <h4 className="text-yellow-400 font-medium mb-2">Scores par nombre de clusters</h4>
+                      <div className="bg-slate-700 p-3 rounded-lg">
+                        <div className="grid grid-cols-4 gap-2 text-xs">
+                          <div className="text-slate-400 font-medium">k</div>
+                          <div className="text-slate-400 font-medium">Inertie</div>
+                          <div className="text-slate-400 font-medium">Silhouette</div>
+                          <div className="text-slate-400 font-medium">Statut</div>
+                          {optimizationResults.scores.map((score: any, idx: number) => (
+                            <React.Fragment key={idx}>
+                              <div className="text-white font-mono">{score.k}</div>
+                              <div className="text-white font-mono">{score.inertia?.toFixed(2)}</div>
+                              <div className="text-white font-mono">{score.silhouette?.toFixed(3)}</div>
+                              <div className={`font-mono text-xs ${
+                                score.k === optimizationResults.recommended_k ? 'text-yellow-400' : 'text-slate-400'
+                              }`}>
+                                {score.k === optimizationResults.recommended_k ? '✅ Optimal' : ''}
+                              </div>
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

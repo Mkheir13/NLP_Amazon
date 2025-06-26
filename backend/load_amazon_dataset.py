@@ -1,291 +1,340 @@
+#!/usr/bin/env python3
 """
-Module pour charger le dataset Amazon/polarity
+Dataset Amazon Polarity - Téléchargement et chargement du dataset complet
+Télécharge le vrai dataset Amazon Polarity (3.6M train + 400K test)
 """
 
 import os
 import pandas as pd
 import numpy as np
-from typing import List, Tuple, Dict
-import requests
-import tarfile
-import gzip
-from pathlib import Path
-import random
+from typing import Dict, List, Tuple, Optional
+import logging
 
-class AmazonPolarityLoader:
-    """Chargeur pour le dataset Amazon/polarity"""
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def download_amazon_polarity_dataset(force_download: bool = False) -> bool:
+    """
+    Télécharge le dataset Amazon Polarity complet depuis Hugging Face
     
-    def __init__(self, cache_dir: str = "./data/amazon_polarity"):
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        # URLs du dataset Amazon/polarity
-        self.urls = {
-            'train': 'https://drive.google.com/uc?export=download&id=0Bz8a_Dbh9QhbaW12WVVZS2drcnM',
-            'test': 'https://drive.google.com/uc?export=download&id=0Bz8a_Dbh9QhbZlU4dXhHTFhZQU0'
-        }
-        
-        # Chemins locaux
-        self.train_file = self.cache_dir / "train.csv"
-        self.test_file = self.cache_dir / "test.csv"
+    Args:
+        force_download: Force le re-téléchargement même si les fichiers existent
     
-    def download_dataset(self) -> bool:
-        """Télécharge le dataset Amazon/polarity si nécessaire"""
-        try:
-            print("📂 Vérification du dataset Amazon/polarity...")
-            
-            # Vérifier si déjà téléchargé
-            if self.train_file.exists() and self.test_file.exists():
-                print("✅ Dataset déjà présent en cache")
-                return True
-            
-            print("⬇️ Téléchargement du dataset Amazon/polarity...")
-            
-            # Créer un dataset simulé pour le développement
-            # En production, vous utiliseriez le vrai dataset
-            self._create_simulated_dataset()
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ Erreur téléchargement dataset: {e}")
-            return False
+    Returns:
+        bool: True si le téléchargement réussit, False sinon
+    """
+    try:
+        from datasets import load_dataset
+        
+        # Chemins des fichiers
+        train_path = "data/amazon_polarity/train.csv"
+        test_path = "data/amazon_polarity/test.csv"
+        
+        # Vérifier si les fichiers existent déjà et sont volumineux
+        if not force_download:
+            if (os.path.exists(train_path) and os.path.exists(test_path)):
+                train_size = os.path.getsize(train_path) / (1024 * 1024)  # MB
+                test_size = os.path.getsize(test_path) / (1024 * 1024)   # MB
+                
+                # Si les fichiers sont volumineux (dataset complet), pas besoin de re-télécharger  
+                if train_size > 100 and test_size > 20:  # Au moins 100MB train et 20MB test
+                    logger.info(f"✅ Dataset complet déjà présent (Train: {train_size:.1f}MB, Test: {test_size:.1f}MB)")
+                    return True
+        
+        logger.info("📥 Téléchargement du dataset Amazon Polarity complet...")
+        logger.info("⚠️  ATTENTION: Le dataset complet fait ~500MB, cela peut prendre plusieurs minutes")
+        
+        # Créer le répertoire si nécessaire
+        os.makedirs("data/amazon_polarity", exist_ok=True)
+        
+        # Télécharger le dataset complet
+        dataset = load_dataset("amazon_polarity")
+        
+        # Convertir en DataFrames
+        train_df = pd.DataFrame(dataset['train'])
+        test_df = pd.DataFrame(dataset['test'])
+        
+        # Mapper les labels (0,1) vers (1,2) pour correspondre au format attendu
+        train_df['label'] = train_df['label'] + 1
+        test_df['label'] = test_df['label'] + 1
+        
+        # Renommer les colonnes pour correspondre au format attendu
+        train_df = train_df.rename(columns={'content': 'text'})
+        test_df = test_df.rename(columns={'content': 'text'})
+        
+        # Sauvegarder les fichiers CSV
+        train_df.to_csv(train_path, index=False)
+        test_df.to_csv(test_path, index=False)
+        
+        logger.info(f"✅ Dataset téléchargé avec succès!")
+        logger.info(f"📊 Train: {len(train_df):,} échantillons")
+        logger.info(f"📊 Test: {len(test_df):,} échantillons")
+        logger.info(f"💾 Taille train: {os.path.getsize(train_path) / (1024*1024):.1f}MB")
+        logger.info(f"💾 Taille test: {os.path.getsize(test_path) / (1024*1024):.1f}MB")
+        
+        return True
+        
+    except ImportError:
+        logger.error("❌ La librairie 'datasets' n'est pas installée")
+        logger.error("💡 Installez avec: pip install datasets")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Erreur lors du téléchargement: {e}")
+        return False
+
+def load_amazon_polarity_dataset(
+    max_samples: int = None,
+    split: str = "train",
+    random_sample: bool = False,
+    use_full_dataset: bool = True
+) -> List[Dict]:
+    """
+    Charge le dataset Amazon Polarity
     
-    def _create_simulated_dataset(self):
-        """Crée un dataset simulé basé sur Amazon/polarity"""
-        print("🔧 Création d'un dataset Amazon/polarity simulé...")
-        
-        # Avis positifs (label 2) - 50 avis
-        positive_reviews = [
-            "This product is absolutely fantastic and exceeded all my expectations",
-            "Outstanding quality and excellent customer service experience",
-            "Perfect item exactly as described with fast shipping",
-            "Amazing value for money highly recommend to everyone",
-            "Superb build quality and beautiful design love it",
-            "Excellent product works perfectly as advertised",
-            "Great purchase very satisfied with the quality",
-            "Fantastic item arrived quickly and well packaged",
-            "Perfect condition and exactly what I needed",
-            "Outstanding product quality exceeds expectations",
-            "Brilliant item great value and fast delivery",
-            "Excellent quality product highly recommend",
-            "Amazing customer service and perfect product",
-            "Great item works perfectly love the design",
-            "Perfect purchase exactly as described",
-            "Outstanding value for money excellent quality",
-            "Fantastic product arrived in perfect condition",
-            "Great quality item very happy with purchase",
-            "Excellent service and perfect product quality",
-            "Amazing item exceeded all expectations",
-            "Perfect product great value highly recommend",
-            "Outstanding quality and excellent design",
-            "Brilliant purchase very satisfied with item",
-            "Great product perfect condition fast shipping",
-            "Excellent item works perfectly as expected",
-            "Wonderful product highly recommend to others",
-            "Superb quality excellent craftsmanship throughout",
-            "Perfect size fits exactly what I needed",
-            "Amazing durability withstands heavy daily use",
-            "Excellent materials feel premium and solid",
-            "Great functionality works better than expected",
-            "Outstanding performance exceeds all requirements",
-            "Perfect design both beautiful and practical",
-            "Amazing features make life so much easier",
-            "Excellent value worth every penny spent",
-            "Great packaging arrived safely and securely",
-            "Outstanding seller fast shipping great communication",
-            "Perfect color matches description exactly",
-            "Amazing battery life lasts much longer",
-            "Excellent instructions easy to understand setup",
-            "Great compatibility works with all devices",
-            "Outstanding warranty gives peace of mind",
-            "Perfect weight feels substantial but portable",
-            "Amazing technology cutting edge and reliable",
-            "Excellent support team very helpful responses",
-            "Great upgrade significant improvement over old",
-            "Outstanding reliability never had any issues",
-            "Perfect gift recipient absolutely loved it",
-            "Amazing innovation clever design solutions throughout",
-            "Excellent finish looks professional and polished"
-        ]
-        
-        # Avis négatifs (label 1) - 50 avis
-        negative_reviews = [
-            "Terrible product completely broken on arrival very disappointed",
-            "Awful quality waste of money do not recommend",
-            "Poor construction broke after one week of use",
-            "Horrible customer service and defective product received",
-            "Very poor quality not as described in listing",
-            "Terrible experience product arrived damaged and unusable",
-            "Awful build quality cheap materials and poor design",
-            "Poor value for money overpriced and low quality",
-            "Horrible product quality control issues evident",
-            "Very disappointing purchase not worth the price",
-            "Terrible item arrived broken and poorly packaged",
-            "Awful experience poor quality and slow shipping",
-            "Poor product design flawed and poorly constructed",
-            "Horrible value completely different from description",
-            "Very poor experience defective item received twice",
-            "Terrible quality materials cheap and poorly made",
-            "Awful customer service unhelpful and rude staff",
-            "Poor shipping damaged package and broken item",
-            "Horrible experience misleading product description",
-            "Very disappointing quality not worth purchasing",
-            "Terrible product broke immediately after opening",
-            "Awful quality control multiple defects found",
-            "Poor construction materials feel cheap and flimsy",
-            "Horrible experience worst purchase ever made",
-            "Very poor value overpriced for terrible quality",
-            "Disappointing product failed to meet expectations",
-            "Useless item does not work at all",
-            "Flimsy construction falls apart easily",
-            "Overpriced junk not worth the money",
-            "Faulty product constant malfunctions and errors",
-            "Cheap materials look and feel terrible",
-            "Unreliable device crashes frequently during use",
-            "Uncomfortable design causes pain after use",
-            "Slow performance much slower than advertised",
-            "Confusing interface difficult to navigate properly",
-            "Loud operation makes annoying noise constantly",
-            "Short battery life dies quickly needs charging",
-            "Incompatible software does not work with system",
-            "Heavy weight too bulky and cumbersome",
-            "Outdated technology feels ancient and sluggish",
-            "Misleading description nothing like what arrived",
-            "Fragile construction breaks with normal use",
-            "Expensive maintenance costs more than expected",
-            "Limited functionality missing important features promised",
-            "Unstable connection drops frequently during operation",
-            "Complicated setup took hours to configure",
-            "Scratches easily looks worn after days",
-            "Noisy fan makes distracting sounds constantly",
-            "Poor screen quality dim and hard to read",
-            "Buggy software crashes and freezes regularly"
-        ]
-        
-        # Créer les DataFrames
-        train_data = []
-        test_data = []
-        
-        # Données d'entraînement (80% du dataset)
-        for i, review in enumerate(positive_reviews[:40]):
-            train_data.append({'label': 2, 'title': f'Positive Review {i+1}', 'text': review})
-        
-        for i, review in enumerate(negative_reviews[:40]):
-            train_data.append({'label': 1, 'title': f'Negative Review {i+1}', 'text': review})
-        
-        # Données de test (20% du dataset)
-        for i, review in enumerate(positive_reviews[40:]):
-            test_data.append({'label': 2, 'title': f'Positive Test {i+1}', 'text': review})
-        
-        for i, review in enumerate(negative_reviews[40:]):
-            test_data.append({'label': 1, 'title': f'Negative Test {i+1}', 'text': review})
-        
-        # Sauvegarder en CSV
-        train_df = pd.DataFrame(train_data)
-        test_df = pd.DataFrame(test_data)
-        
-        train_df.to_csv(self.train_file, index=False)
-        test_df.to_csv(self.test_file, index=False)
-        
-        print(f"✅ Dataset simulé créé:")
-        print(f"   📊 Train: {len(train_df)} avis")
-        print(f"   📊 Test: {len(test_df)} avis")
+    Args:
+        max_samples: Nombre maximum d'échantillons à charger (None = tous)
+        split: 'train', 'test', ou 'all'
+        random_sample: Si True, échantillonnage aléatoire
+        use_full_dataset: Si True, tente de télécharger le dataset complet
     
-    def load_data(self, split: str = 'train', max_samples: int = None, random_sample: bool = False) -> List[str]:
-        """Charge les données du dataset"""
-        try:
-            # S'assurer que le dataset est disponible
-            if not self.download_dataset():
-                raise Exception("Impossible de charger le dataset")
-            
-            # Charger le fichier approprié
-            if split == 'train':
-                df = pd.read_csv(self.train_file)
-            elif split == 'test':
-                df = pd.read_csv(self.test_file)
+    Returns:
+        List[Dict]: Liste des échantillons avec 'text' et 'label'
+    """
+    
+    # Tentative de téléchargement du dataset complet
+    if use_full_dataset:
+        download_success = download_amazon_polarity_dataset()
+        if not download_success:
+            logger.warning("⚠️  Échec du téléchargement, utilisation du dataset de fallback")
+            return load_fallback_dataset(max_samples, split, random_sample)
+    
+    try:
+        # Chemins des fichiers
+        train_path = "data/amazon_polarity/train.csv"
+        test_path = "data/amazon_polarity/test.csv"
+        
+        # Charger les données selon le split demandé
+        if split == "train":
+            if not os.path.exists(train_path):
+                logger.warning("❌ Fichier train.csv non trouvé, utilisation du fallback")
+                return load_fallback_dataset(max_samples, split, random_sample)
+            df = pd.read_csv(train_path)
+        elif split == "test":
+            if not os.path.exists(test_path):
+                logger.warning("❌ Fichier test.csv non trouvé, utilisation du fallback")
+                return load_fallback_dataset(max_samples, split, random_sample)
+            df = pd.read_csv(test_path)
+        elif split == "all":
+            dfs = []
+            if os.path.exists(train_path):
+                dfs.append(pd.read_csv(train_path))
+            if os.path.exists(test_path):
+                dfs.append(pd.read_csv(test_path))
+            if not dfs:
+                logger.warning("❌ Aucun fichier trouvé, utilisation du fallback")
+                return load_fallback_dataset(max_samples, split, random_sample)
+            df = pd.concat(dfs, ignore_index=True)
+        else:
+            logger.error(f"❌ Split invalide: {split}")
+            return []
+        
+        # Vérifier les colonnes nécessaires
+        if 'text' not in df.columns or 'label' not in df.columns:
+            logger.error("❌ Colonnes 'text' et 'label' requises")
+            return load_fallback_dataset(max_samples, split, random_sample)
+        
+        # Nettoyer les données
+        df = df.dropna(subset=['text', 'label'])
+        
+        # Échantillonnage si demandé
+        if max_samples and len(df) > max_samples:
+            if random_sample:
+                df = df.sample(n=max_samples, random_state=42)
             else:
-                # Charger les deux
-                train_df = pd.read_csv(self.train_file)
-                test_df = pd.read_csv(self.test_file)
-                df = pd.concat([train_df, test_df], ignore_index=True)
-            
-            # Extraire les textes
-            texts = df['text'].tolist()
-            
-            # Sélection aléatoire ou limitation du nombre d'échantillons
-            if max_samples and len(texts) > max_samples:
-                if random_sample:
-                    texts = random.sample(texts, max_samples)
-                else:
-                    texts = texts[:max_samples]
-            elif random_sample:
-                # Mélanger tous les textes
-                texts = texts.copy()
-                random.shuffle(texts)
-            
-            print(f"✅ Dataset Amazon/polarity chargé: {len(texts)} avis ({split})")
-            return texts
-            
-        except Exception as e:
-            print(f"❌ Erreur chargement dataset: {e}")
-            # Fallback vers un dataset minimal
-            return [
-                "This product is excellent quality and I love it",
-                "Great value for money highly recommend",
-                "Terrible product completely broken on arrival",
-                "Very poor quality waste of money"
-            ]
-    
-    def load_labeled_data(self, split: str = 'train', max_samples: int = None) -> Tuple[List[str], List[int]]:
-        """Charge les données avec labels"""
-        try:
-            if not self.download_dataset():
-                raise Exception("Impossible de charger le dataset")
-            
-            if split == 'train':
-                df = pd.read_csv(self.train_file)
-            elif split == 'test':
-                df = pd.read_csv(self.test_file)
-            else:
-                train_df = pd.read_csv(self.train_file)
-                test_df = pd.read_csv(self.test_file)
-                df = pd.concat([train_df, test_df], ignore_index=True)
-            
-            if max_samples and len(df) > max_samples:
                 df = df.head(max_samples)
-            
-            texts = df['text'].tolist()
-            labels = df['label'].tolist()
-            
-            print(f"✅ Dataset Amazon/polarity avec labels chargé: {len(texts)} avis")
-            return texts, labels
-            
-        except Exception as e:
-            print(f"❌ Erreur chargement dataset avec labels: {e}")
-            return ["Great product", "Terrible item"], [2, 1]
+        
+        # Convertir en format attendu
+        samples = []
+        for _, row in df.iterrows():
+            samples.append({
+                'text': str(row['text']),
+                'label': int(row['label'])
+            })
+        
+        logger.info(f"✅ Dataset chargé: {len(samples):,} échantillons ({split})")
+        
+        # Statistiques
+        if samples:
+            labels = [s['label'] for s in samples]
+            pos_count = sum(1 for l in labels if l == 2)
+            neg_count = sum(1 for l in labels if l == 1)
+            logger.info(f"📊 Positifs: {pos_count:,} | Négatifs: {neg_count:,}")
+        
+        return samples
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur lors du chargement: {e}")
+        return load_fallback_dataset(max_samples, split, random_sample)
+
+def load_fallback_dataset(
+    max_samples: int = None,
+    split: str = "train", 
+    random_sample: bool = False
+) -> List[Dict]:
+    """
+    Dataset de fallback si le téléchargement échoue
+    """
+    logger.info("🔄 Utilisation du dataset de fallback...")
+    
+    # Données de base pour les tests
+    fallback_samples = [
+        {"text": "This product is amazing! Great quality and fast shipping.", "label": 2},
+        {"text": "Excellent purchase, highly recommend to everyone.", "label": 2},
+        {"text": "Perfect item, exactly as described.", "label": 2},
+        {"text": "Outstanding quality, exceeded my expectations.", "label": 2},
+        {"text": "Fantastic product, will buy again.", "label": 2},
+        {"text": "Terrible quality, broke after one day.", "label": 1},
+        {"text": "Worst purchase ever, complete waste of money.", "label": 1},
+        {"text": "Poor quality materials, very disappointed.", "label": 1},
+        {"text": "Awful product, doesn't work as advertised.", "label": 1},
+        {"text": "Horrible experience, would not recommend.", "label": 1},
+    ]
+    
+    # Dupliquer pour avoir plus de données si nécessaire
+    if max_samples and max_samples > len(fallback_samples):
+        multiplier = (max_samples // len(fallback_samples)) + 1
+        fallback_samples = fallback_samples * multiplier
+    
+    # Appliquer les filtres
+    if max_samples:
+        if random_sample:
+            np.random.seed(42)
+            indices = np.random.choice(len(fallback_samples), min(max_samples, len(fallback_samples)), replace=False)
+            fallback_samples = [fallback_samples[i] for i in indices]
+        else:
+            fallback_samples = fallback_samples[:max_samples]
+    
+    logger.info(f"✅ Dataset fallback: {len(fallback_samples)} échantillons")
+    return fallback_samples
+
+def get_dataset_info() -> Dict:
+    """
+    Retourne des informations sur le dataset disponible
+    """
+    train_path = "data/amazon_polarity/train.csv"
+    test_path = "data/amazon_polarity/test.csv"
+    
+    info = {
+        "train_exists": os.path.exists(train_path),
+        "test_exists": os.path.exists(test_path),
+        "train_size": 0,
+        "test_size": 0,
+        "train_file_size_mb": 0,
+        "test_file_size_mb": 0,
+        "is_full_dataset": False
+    }
+    
+    if info["train_exists"]:
+        try:
+            df = pd.read_csv(train_path)
+            info["train_size"] = len(df)
+            info["train_file_size_mb"] = os.path.getsize(train_path) / (1024 * 1024)
+        except:
+            pass
+    
+    if info["test_exists"]:
+        try:
+            df = pd.read_csv(test_path)
+            info["test_size"] = len(df)
+            info["test_file_size_mb"] = os.path.getsize(test_path) / (1024 * 1024)
+        except:
+            pass
+    
+    # Déterminer si c'est le dataset complet (heuristique basée sur la taille)
+    info["is_full_dataset"] = (
+        info["train_size"] > 1000000 and  # Plus d'1M d'échantillons d'entraînement
+        info["test_size"] > 100000        # Plus de 100K d'échantillons de test
+    )
+    
+    return info
+
+class AmazonDatasetLoader:
+    """
+    Classe pour charger le dataset Amazon Polarity complet
+    """
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+    
+    def load_data(self, split: str = "train", max_samples: int = None, random_sample: bool = False) -> List[str]:
+        """
+        Charge les textes du dataset (format simple pour compatibilité)
+        
+        Returns:
+            List[str]: Liste des textes seulement
+        """
+        samples = load_amazon_polarity_dataset(max_samples, split, random_sample, use_full_dataset=True)
+        return [sample['text'] for sample in samples]
+    
+    def load_labeled_data(self, split: str = "train", max_samples: int = None, random_sample: bool = False) -> Tuple[List[str], List[int]]:
+        """
+        Charge les textes et labels du dataset
+        
+        Returns:
+            Tuple[List[str], List[int]]: (textes, labels)
+        """
+        samples = load_amazon_polarity_dataset(max_samples, split, random_sample, use_full_dataset=True)
+        texts = [sample['text'] for sample in samples]
+        labels = [sample['label'] for sample in samples]
+        return texts, labels
     
     def get_statistics(self) -> Dict:
-        """Retourne les statistiques du dataset"""
-        try:
-            train_df = pd.read_csv(self.train_file)
-            test_df = pd.read_csv(self.test_file)
-            
-            stats = {
-                'train_size': len(train_df),
-                'test_size': len(test_df),
-                'total_size': len(train_df) + len(test_df),
-                'positive_ratio': (train_df['label'] == 2).mean(),
-                'negative_ratio': (train_df['label'] == 1).mean(),
-                'avg_text_length': train_df['text'].str.len().mean(),
-                'dataset_name': 'Amazon Polarity'
-            }
-            
-            return stats
-            
-        except Exception as e:
-            print(f"❌ Erreur calcul statistiques: {e}")
-            return {'error': str(e)}
+        """
+        Retourne les statistiques du dataset
+        """
+        return get_dataset_info()
 
-# Instance globale
-amazon_loader = AmazonPolarityLoader() 
+# Instance globale pour compatibilité
+amazon_loader = AmazonDatasetLoader()
+
+if __name__ == "__main__":
+    # Test du téléchargement
+    print("🚀 Test du téléchargement du dataset Amazon Polarity complet...")
+    
+    # Afficher les infos actuelles
+    info = get_dataset_info()
+    print(f"📊 État actuel:")
+    print(f"   Train: {info['train_size']:,} échantillons ({info['train_file_size_mb']:.1f}MB)")
+    print(f"   Test: {info['test_size']:,} échantillons ({info['test_file_size_mb']:.1f}MB)")
+    print(f"   Dataset complet: {'✅' if info['is_full_dataset'] else '❌'}")
+    
+    # Télécharger le dataset complet
+    if not info['is_full_dataset']:
+        print("\n📥 Téléchargement du dataset complet...")
+        success = download_amazon_polarity_dataset(force_download=True)
+        
+        if success:
+            # Afficher les nouvelles infos
+            info = get_dataset_info()
+            print(f"\n✅ Téléchargement terminé!")
+            print(f"📊 Nouveau état:")
+            print(f"   Train: {info['train_size']:,} échantillons ({info['train_file_size_mb']:.1f}MB)")
+            print(f"   Test: {info['test_size']:,} échantillons ({info['test_file_size_mb']:.1f}MB)")
+            print(f"   Dataset complet: {'✅' if info['is_full_dataset'] else '❌'}")
+        else:
+            print("❌ Échec du téléchargement")
+    else:
+        print("✅ Dataset complet déjà disponible!")
+    
+    # Test de chargement
+    print("\n🧪 Test de chargement...")
+    samples = load_amazon_polarity_dataset(max_samples=10, split="train")
+    print(f"📊 Échantillons chargés: {len(samples)}")
+    
+    if samples:
+        print("\n📝 Premiers échantillons:")
+        for i, sample in enumerate(samples[:3]):
+            label_text = "Positif" if sample['label'] == 2 else "Négatif"
+            text_preview = sample['text'][:100] + "..." if len(sample['text']) > 100 else sample['text']
+            print(f"   {i+1}. [{label_text}] {text_preview}") 

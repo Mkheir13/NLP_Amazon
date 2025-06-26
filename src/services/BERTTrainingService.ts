@@ -183,7 +183,10 @@ export class BERTTrainingService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        if (response.status === 404) {
+          throw new Error('Modèle non trouvé');
+        }
+        const errorData = await response.json().catch(() => ({ error: 'Erreur serveur' }));
         throw new Error(errorData.error || 'Erreur lors de la prédiction');
       }
 
@@ -203,19 +206,29 @@ export class BERTTrainingService {
       confidence: number;
       class: number;
     };
+    error?: string;
   }> {
     try {
-      const promises: Promise<any>[] = [this.analyzeWithNLTK(text)];
+      // Toujours analyser avec NLTK
+      const nltkResult = await this.analyzeWithNLTK(text);
       
+      let bertResult = undefined;
+      let error = undefined;
+      
+      // Essayer BERT si un modèle est spécifié
       if (bertModelId) {
-        promises.push(this.predictWithBERT(bertModelId, text));
+        try {
+          bertResult = await this.predictWithBERT(bertModelId, text);
+        } catch (bertError) {
+          console.warn('Erreur BERT, analyse NLTK seulement:', bertError);
+          error = bertError instanceof Error ? bertError.message : 'Erreur BERT inconnue';
+        }
       }
-
-      const results = await Promise.all(promises);
       
       return {
-        nltk: results[0],
-        bert: results[1] || undefined
+        nltk: nltkResult,
+        bert: bertResult,
+        error: error
       };
     } catch (error) {
       console.error('Erreur comparaison:', error);

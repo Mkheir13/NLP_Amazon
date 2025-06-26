@@ -34,19 +34,41 @@ backend/.env
 backend/venv/
 backend/.venv/
 
-# Large model files (BERT, etc.)
+# Large model files (BERT, RNN, Autoencoder)
+models/
 backend/models/bert_*/
-backend/models/*/model.safetensors
-backend/models/*/pytorch_model.bin
-backend/models/*/optimizer.pt
-backend/models/*/scheduler.pt
-backend/models/*/rng_state.pth
-backend/models/*/training_args.bin
-backend/models/*/trainer_state.json
-backend/models/*/checkpoint-*/
+backend/models/autoencoder/
+backend/models/rnn/
+backend/models/embeddings/
+*.safetensors
+*.bin
+*.pth
+*.pkl
+*.h5
+*.pt
+
+# Large dataset files
+data/amazon_polarity/train.csv
+data/amazon_polarity/test.csv
 
 # Keep only essential config files
 !backend/models/*/config.json
 !backend/models/*/tokenizer_config.json
 !backend/models/*/special_tokens_map.json
 !backend/models/*/model_info.json
+!backend/models/*/metadata.json
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

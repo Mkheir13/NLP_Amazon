@@ -92,6 +92,12 @@ export const BERTTraining: React.FC<BERTTrainingProps> = ({ reviews }) => {
         const comparison = await BERTTrainingService.compareAnalysis(testText, selectedModel.id);
         setNltkResult(comparison.nltk);
         setBertPrediction(comparison.bert);
+        
+        // Afficher un avertissement si BERT a échoué
+        if (comparison.error) {
+          console.warn('Erreur BERT:', comparison.error);
+          setTrainingStatus(`NLTK analysé avec succès. BERT: ${comparison.error}`);
+        }
       } else {
         // Analyse avec NLTK seulement
         const result = await BERTTrainingService.analyzeWithNLTK(testText);
@@ -360,8 +366,14 @@ export const BERTTraining: React.FC<BERTTrainingProps> = ({ reviews }) => {
                       <p className="text-white/60 text-sm">
                         {model.model_name} • {new Date(model.created_at).toLocaleDateString()}
                       </p>
+                      <p className="text-white/40 text-xs font-mono">ID: {model.id}</p>
                     </div>
                   </div>
+                  {selectedModel?.id === model.id && (
+                    <div className="px-3 py-1 bg-purple-500/30 text-purple-300 rounded-lg text-sm font-medium">
+                      Sélectionné
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -431,6 +443,22 @@ export const BERTTraining: React.FC<BERTTrainingProps> = ({ reviews }) => {
               </>
             )}
           </button>
+
+          {/* Avertissement si erreur BERT */}
+          {trainingStatus.includes('BERT:') && (
+            <div className="p-4 bg-yellow-500/20 rounded-xl border border-yellow-500/30">
+              <div className="flex items-center space-x-3">
+                <AlertCircle className="h-5 w-5 text-yellow-400" />
+                <div>
+                  <h4 className="text-yellow-400 font-bold">Avertissement</h4>
+                  <p className="text-white/70 text-sm">{trainingStatus}</p>
+                  <p className="text-white/60 text-xs mt-1">
+                    Le modèle BERT sélectionné n'est peut-être plus disponible. Essayez d'en entraîner un nouveau.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Résultats */}
           {(nltkResult || bertPrediction) && (

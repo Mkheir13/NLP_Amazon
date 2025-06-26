@@ -15,29 +15,57 @@ class Config:
     API_DEBUG = os.getenv('API_DEBUG', 'False').lower() == 'true'
     
     # CORS Configuration
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175').split(',')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178').split(',')
     
     # Autoencoder Configuration
     AUTOENCODER_CONFIG = {
-        'input_dim': int(os.getenv('AUTOENCODER_INPUT_DIM', 1000)),
-        'encoding_dim': int(os.getenv('AUTOENCODER_ENCODING_DIM', 128)),
-        'hidden_layers': [512, 128],  # Peut être configuré via env si nécessaire
+        'input_dim': int(os.getenv('AUTOENCODER_INPUT_DIM', 2000)),  # Adapté au TF-IDF
+        'encoding_dim': int(os.getenv('AUTOENCODER_ENCODING_DIM', 256)),
+        'hidden_layers': [1024, 512],  # Couches plus larges pour plus de capacité
         'activation': os.getenv('AUTOENCODER_ACTIVATION', 'relu'),
         'optimizer': os.getenv('AUTOENCODER_OPTIMIZER', 'adam'),
         'learning_rate': float(os.getenv('AUTOENCODER_LEARNING_RATE', 0.0005)),
         'epochs': int(os.getenv('AUTOENCODER_EPOCHS', 100)),
         'batch_size': int(os.getenv('AUTOENCODER_BATCH_SIZE', 16)),
         'validation_split': float(os.getenv('AUTOENCODER_VALIDATION_SPLIT', 0.2)),
-        'patience': int(os.getenv('AUTOENCODER_PATIENCE', 10))
+        'patience': int(os.getenv('AUTOENCODER_PATIENCE', 10)),
+        
+        # 🎯 PARAMETRES DE REGULARISATION AVANCES
+        # Régularisation L2 (Ridge) - Pénalise les poids trop élevés
+        'l2_regularization': float(os.getenv('AUTOENCODER_L2_REG', 0.001)),  # λ pour L2
+        'l2_kernel_reg': float(os.getenv('AUTOENCODER_L2_KERNEL', 0.001)),   # Régularisation des poids
+        'l2_bias_reg': float(os.getenv('AUTOENCODER_L2_BIAS', 0.0005)),      # Régularisation des biais
+        
+        # Dropout - Désactivation aléatoire de neurones
+        'dropout_rates': [0.1, 0.2, 0.3],  # Dropout progressif par couche
+        'dropout_encoder': float(os.getenv('AUTOENCODER_DROPOUT_ENC', 0.2)), # Dropout encoder
+        'dropout_decoder': float(os.getenv('AUTOENCODER_DROPOUT_DEC', 0.1)), # Dropout decoder
+        'dropout_bottleneck': float(os.getenv('AUTOENCODER_DROPOUT_BOTTLE', 0.0)), # Pas de dropout au goulot
+        
+        # Batch Normalization - Stabilisation de l'entraînement
+        'use_batch_norm': os.getenv('AUTOENCODER_BATCH_NORM', 'True').lower() == 'true',
+        'batch_norm_momentum': float(os.getenv('AUTOENCODER_BN_MOMENTUM', 0.99)),
+        
+        # Early Stopping avancé
+        'early_stopping_monitor': os.getenv('AUTOENCODER_ES_MONITOR', 'val_loss'),
+        'early_stopping_patience': int(os.getenv('AUTOENCODER_ES_PATIENCE', 15)),
+        'early_stopping_min_delta': float(os.getenv('AUTOENCODER_ES_MIN_DELTA', 0.0001)),
+        'restore_best_weights': os.getenv('AUTOENCODER_RESTORE_BEST', 'True').lower() == 'true',
+        
+        # Learning Rate Scheduling
+        'reduce_lr_on_plateau': os.getenv('AUTOENCODER_REDUCE_LR', 'True').lower() == 'true',
+        'lr_reduction_factor': float(os.getenv('AUTOENCODER_LR_FACTOR', 0.5)),
+        'lr_reduction_patience': int(os.getenv('AUTOENCODER_LR_PATIENCE', 8)),
+        'min_learning_rate': float(os.getenv('AUTOENCODER_MIN_LR', 1e-7))
     }
     
     # TF-IDF Configuration
     TFIDF_CONFIG = {
-        'max_features': int(os.getenv('TFIDF_MAX_FEATURES', 1000)),
+        'max_features': int(os.getenv('TFIDF_MAX_FEATURES', 2000)),  # Plus de features
         'stop_words': os.getenv('TFIDF_STOP_WORDS', 'english'),
-        'ngram_range': (1, 2),  # Peut être configuré si nécessaire
-        'min_df': int(os.getenv('TFIDF_MIN_DF', 2)),
-        'max_df': float(os.getenv('TFIDF_MAX_DF', 0.8)),
+        'ngram_range': (1, 3),  # Trigrammes pour plus de contexte
+        'min_df': int(os.getenv('TFIDF_MIN_DF', 1)),  # Moins restrictif
+        'max_df': float(os.getenv('TFIDF_MAX_DF', 0.9)),  # Moins restrictif
         'sublinear_tf': os.getenv('TFIDF_SUBLINEAR_TF', 'True').lower() == 'true'
     }
     

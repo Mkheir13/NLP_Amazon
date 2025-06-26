@@ -1,13 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Database, BarChart3, Search, Play, ArrowRight, Github, Sparkles, Zap, ChevronRight, Home, RefreshCw, Target, TrendingUp, Award, Rocket, Globe, Shield, CheckCircle, AlertCircle, Eye, Hash, Clock, FileText, Activity, Download, Copy, Star, ThumbsUp, ThumbsDown, Filter, Shuffle, Settings, Layers, Heart, Minus, Network } from 'lucide-react';
+import { 
+  Brain, Database, BarChart3, Search, Play, ArrowRight, Github, Sparkles, Zap, 
+  ChevronRight, Home, RefreshCw, Target, TrendingUp, Award, Rocket, Globe, Shield, 
+  CheckCircle, AlertCircle, Eye, Hash, Clock, FileText, Activity, Download, Copy, 
+  Star, ThumbsUp, ThumbsDown, Filter, Shuffle, Settings, Layers, Heart, Minus, 
+  Network, Code2, BookOpen, Lightbulb, GraduationCap, Beaker, Microscope,
+  PieChart, LineChart, Radar, Map, Compass, Route, Flag, Trophy, Medal,
+  Menu, X, ChevronDown, ChevronUp, Folder, FolderOpen, Terminal, Cpu, Zap as Lightning,
+  GitBranch, Package, Wrench, Monitor, Gauge, BarChart, TrendingUp as Trending, Cloud,
+  Info
+} from 'lucide-react';
+
 import { NLPPipeline } from './components/NLPPipeline';
 import { BERTTraining } from './components/BERTTraining';
+import RNNTraining from './components/RNNTraining';
 import { EmbeddingHub } from './components/EmbeddingHub';
 import { EmbeddingVisualizer } from './components/EmbeddingVisualizer';
 import { SemanticSearch } from './components/SemanticSearch';
 import { EmbeddingTraining } from './components/EmbeddingTraining';
 import { EmbeddingTrainingSimple } from './components/EmbeddingTrainingSimple';
 import AutoencoderTraining from './components/AutoencoderTraining';
+import SimpleAutoencoder from './components/SimpleAutoencoder';
+import CodeViewer from './components/CodeViewer';
+import InfoPopup from './components/InfoPopup';
 
 import { DatasetLoader, Review } from './services/DatasetLoader';
 import { RealNLPService, RealNLPAnalysis } from './services/RealNLPService';
@@ -31,7 +46,9 @@ interface AnalysisResults {
   keywords: { [key: string]: number };
 }
 
-// Interface principale
+
+
+// Interface principale refontée
 function App() {
   const [currentView, setCurrentView] = useState('home');
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
@@ -42,21 +59,19 @@ function App() {
   const [showPipeline, setShowPipeline] = useState(false);
   const [availableBERTModels, setAvailableBERTModels] = useState<any[]>([]);
   const [selectedBERTModel, setSelectedBERTModel] = useState<string | null>(null);
+  const [trainingTab, setTrainingTab] = useState('bert');
+  const [showCodeViewer, setShowCodeViewer] = useState(false);
+  const [codeViewerStep, setCodeViewerStep] = useState('');
+  
+  // État pour la sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['exploration', 'analysis']);
+  
+  // État pour le popup d'information
+  const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const [infoStepId, setInfoStepId] = useState('');
 
-  // Navigation
-  const views = {
-    home: 'Accueil',
-    explore: 'Explorer Dataset',
-    analyze: 'Analyser Texte',
-    training: 'Entraîner Modèles',
-    pipeline: 'Pipeline NLP',
-    results: 'Résultats',
-    embeddings_hub: 'Hub Embeddings',
-    embeddings: 'Visualiser Embeddings',
-    semantic_search: 'Recherche Sémantique',
-    embedding_training: 'Entraîner Embeddings',
-    autoencoder_training: 'Autoencoder'
-  };
+
 
   // Données du dataset Amazon
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -64,6 +79,80 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sentimentFilter, setSentimentFilter] = useState('all');
   const [isLoadingDataset, setIsLoadingDataset] = useState(false);
+
+  // Configuration de la sidebar avec fonctionnalités disponibles uniquement (SANS DOUBLONS)
+  const sidebarSections = [
+    {
+      id: 'exploration',
+      title: 'Exploration de Données',
+      icon: Database,
+      color: 'cyan',
+      items: [
+        { id: 'home', title: 'Accueil & Guide', icon: Home, description: 'Vue d\'ensemble du projet' },
+        { id: 'explore', title: 'Dataset Amazon', icon: Database, description: 'Explorer les 1000+ avis' }
+      ]
+    },
+    {
+      id: 'analysis',
+      title: 'Analyse & Sentiment',
+      icon: Brain,
+      color: 'purple',
+      items: [
+        { id: 'analyze', title: 'Analyseur NLTK+BERT', icon: Brain, description: 'Comparaison VADER vs BERT' },
+        { id: 'pipeline', title: 'Pipeline Complet', icon: Layers, description: 'Workflow NLP intégré' },
+        { id: 'results', title: 'Résultats Détaillés', icon: BarChart, description: 'Visualisation avancée' }
+      ]
+    },
+    {
+      id: 'training',
+      title: 'Entraînement Modèles',
+      icon: Target,
+      color: 'orange',
+      items: [
+        { id: 'training', title: 'Hub Entraînement', icon: Target, description: 'BERT, RNN, Autoencoder' },
+        { id: 'simple_autoencoder', title: 'Autoencoder Simple', icon: Package, description: 'Version simplifiée' }
+      ]
+    },
+    {
+      id: 'embeddings',
+      title: 'Embeddings & Vectorisation',
+      icon: Network,
+      color: 'emerald',
+      items: [
+        { id: 'embedding_training', title: 'TF-IDF Training', icon: Wrench, description: 'Entraîner embeddings' },
+        { id: 'embedding_visualizer', title: 'Visualisation 2D/3D', icon: Monitor, description: 'Explorer l\'espace vectoriel' }
+      ]
+    },
+    {
+      id: 'search',
+      title: 'Recherche & Similarité',
+      icon: Search,
+      color: 'blue',
+      items: [
+        { id: 'semantic_search', title: 'Recherche Sémantique', icon: Search, description: 'Similarité vectorielle' }
+      ]
+    },
+    {
+      id: 'development',
+      title: 'Code & API',
+      icon: Code2,
+      color: 'slate',
+      items: [
+        { id: 'code_viewer', title: 'Code Source', icon: FileText, description: 'Comprendre l\'implémentation' }
+      ]
+    }
+      ];
+
+  // Fonction pour basculer l'expansion des sections
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => 
+      prev.includes(sectionId) 
+        ? prev.filter(id => id !== sectionId)
+        : [...prev, sectionId]
+    );
+  };
+
+
 
   // Chargement du dataset Amazon Polarity et modèles BERT
   useEffect(() => {
@@ -92,6 +181,22 @@ function App() {
     loadDataset();
   }, []);
 
+  const navigateWithData = (view: string, data?: any) => {
+    setCurrentView(view);
+  };
+
+  // Fonction pour ouvrir le popup d'information
+  const openInfoPopup = (stepId: string) => {
+    setInfoStepId(stepId);
+    setShowInfoPopup(true);
+  };
+
+  // Fonction pour fermer le popup d'information
+  const closeInfoPopup = () => {
+    setShowInfoPopup(false);
+    setInfoStepId('');
+  };
+
   // Filtrage des avis
   useEffect(() => {
     let filtered = reviews;
@@ -109,6 +214,135 @@ function App() {
 
     setFilteredReviews(filtered);
   }, [reviews, sentimentFilter, searchQuery]);
+
+  // Rendu de la page d'accueil refontée
+  const renderHome = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/10 via-blue-500/10 to-purple-600/10 animate-pulse"></div>
+        
+        {/* Header Hero */}
+        <div className="relative pt-16 pb-12 text-center">
+          <div className="flex items-center justify-center space-x-4 mb-8">
+            <div className="relative">
+              <Brain className="h-20 w-20 text-cyan-400 animate-bounce" />
+              <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-400 rounded-full animate-ping"></div>
+            </div>
+            <div className="text-left">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-sm font-medium border border-cyan-500/30">
+                  v3.0 • Refonte UX
+                </span>
+                <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/30">
+                  Navigation Optimisée
+                </span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Analyse NLP Amazon
+              </h1>
+              <p className="text-gray-300 text-lg mt-2">
+                Explorez les techniques NLP appliquées aux avis Amazon avec une interface moderne
+              </p>
+            </div>
+          </div>
+
+          {/* Stats du projet */}
+          <div className="flex items-center justify-center space-x-8 mb-12">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-cyan-400">{reviews.length}</div>
+              <div className="text-gray-400 text-sm">Avis Amazon</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-400">{availableBERTModels.length}</div>
+              <div className="text-gray-400 text-sm">Modèles BERT</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-400">30+</div>
+              <div className="text-gray-400 text-sm">API Endpoints</div>
+            </div>
+          </div>
+
+          {/* Description du projet */}
+          <div className="max-w-4xl mx-auto text-center mb-12">
+            <p className="text-gray-300 text-lg leading-relaxed">
+              Ce projet démontre l'application de techniques NLP modernes sur le dataset Amazon Polarity. 
+              Explorez les différentes approches d'analyse de sentiment, de l'entraînement de modèles deep learning 
+              à la visualisation de données, en passant par la recherche sémantique et les embeddings.
+            </p>
+          </div>
+
+          {/* Actions principales */}
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <button
+              onClick={() => setCurrentView('explore')}
+              className="group px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 flex items-center space-x-3 shadow-lg shadow-cyan-500/25"
+            >
+              <Database className="h-5 w-5 group-hover:animate-pulse" />
+              <span>Explorer les Données</span>
+              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            </button>
+            
+            <button
+              onClick={() => setCurrentView('analyze')}
+              className="group px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 flex items-center space-x-3 shadow-lg shadow-purple-500/25"
+            >
+              <Brain className="h-5 w-5 group-hover:animate-pulse" />
+              <span>Analyser Sentiment</span>
+              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            </button>
+            
+            <button
+              onClick={() => setCurrentView('training')}
+              className="group px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 flex items-center space-x-3 shadow-lg shadow-orange-500/25"
+            >
+              <Target className="h-5 w-5 group-hover:animate-pulse" />
+              <span>Entraîner Modèles</span>
+              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+        </div>
+
+        {/* Fonctionnalités en grille */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+          <h2 className="text-3xl font-bold text-center text-white mb-12">Fonctionnalités Disponibles</h2>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {sidebarSections.map((section) => (
+              <div key={section.id} className={`bg-gradient-to-br from-${section.color}-500/20 to-${section.color}-600/10 backdrop-blur-sm rounded-2xl p-6 border border-${section.color}-500/30 hover:scale-105 transition-all duration-300 group`}>
+                <div className="flex items-center space-x-4 mb-4">
+                  {section.icon && (
+                    <div className={`p-3 rounded-xl bg-${section.color}-500/20 group-hover:scale-110 transition-transform`}>
+                      <section.icon className={`h-8 w-8 text-${section.color}-400`} />
+                    </div>
+                  )}
+                  <h3 className="text-xl font-semibold text-white">{section.title}</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  {section.items.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setCurrentView(item.id)}
+                      className="w-full text-left p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-transparent hover:border-white/20 group/item cursor-pointer"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <item.icon className="h-4 w-4 text-white/60 group-hover/item:text-white/80" />
+                        <div>
+                          <div className="text-sm font-medium text-white/80 group-hover/item:text-white">{item.title}</div>
+                          <div className="text-xs text-white/50">{item.description}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Analyse de texte avec vraie NLP (NLTK + BERT)
   const analyzeText = async (text: string, showPipelineView = false) => {
@@ -145,6 +379,9 @@ function App() {
           keywords: nlpResults.keywords
         };
         setAnalysisResults(legacyResults);
+        
+        // Marquer l'analyse comme terminée
+        console.log('Analyse terminée:', { analysisResults: legacyResults, realNLPResults: nlpResults });
         
       } else {
         console.warn('⚠️ Backend non disponible, utilisation analyse basique...');
@@ -277,6 +514,9 @@ function App() {
   const selectReview = (review: Review) => {
     setSelectedReview(review);
     analyzeText(review.text);
+    
+    // Marquer l'exploration du dataset comme terminée
+    console.log('Dataset exploré:', { selectedReview: review });
   };
 
   // Avis aléatoire
@@ -287,279 +527,7 @@ function App() {
     selectReview(review);
   };
 
-  // Rendu de la page d'accueil avec design amélioré
-  const renderHome = () => (
-    <div className="text-center space-y-12">
-      {/* Hero section avec animation */}
-      <div className="relative pt-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full blur-3xl opacity-20 animate-pulse"></div>
-        <div className="relative">
-          <div className="flex items-center justify-center space-x-4 mb-6">
-            <Brain className="h-32 w-32 text-cyan-400 animate-bounce" />
-            <div className="text-left">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-sm font-medium border border-cyan-500/30">
-                  v3.0 • Embeddings Ready
-                </span>
-                <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium border border-green-500/30">
-                  TF-IDF Intégré
-                </span>
-              </div>
-              <div className="text-4xl md:text-5xl font-bold text-white mb-2">
-                Nouvelle Génération
-              </div>
-              <div className="text-cyan-400 text-lg font-medium">
-                🔗 Embeddings • 🔍 Recherche Sémantique • 📊 Visualisations
-              </div>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h1 className="text-6xl md:text-7xl font-bold">
-              <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                NLP Amazon
-              </span>
-              <br />
-              <span className="text-white">Analysis</span>
-            </h1>
-            <p className="text-2xl text-white/80 max-w-4xl mx-auto leading-relaxed">
-              Pipeline NLP révolutionnaire avec embeddings TF-IDF, recherche sémantique et visualisations interactives
-            </p>
-            <div className="flex items-center justify-center space-x-6 text-lg">
-              <div className="flex items-center space-x-2 text-green-400">
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="font-medium">IA Émotionnelle</span>
-              </div>
-              <div className="flex items-center space-x-2 text-cyan-400">
-                <div className="w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
-                <span className="font-medium">Embeddings TF-IDF</span>
-              </div>
-              <div className="flex items-center space-x-2 text-purple-400">
-                <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
-                <span className="font-medium">Temps Réel</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Cards principales avec hover effects */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-        <button 
-          onClick={() => setCurrentView('explore')}
-          className="group relative p-8 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-2xl border border-cyan-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/25 overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 to-blue-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
-          <div className="relative">
-            <Database className="h-12 w-12 mx-auto mb-4 text-cyan-400 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-xl font-bold mb-3">Explorer Dataset</h3>
-            <p className="text-cyan-100 text-sm leading-relaxed">4M d'avis Amazon avec filtres intelligents</p>
-            <div className="mt-4 flex items-center justify-center space-x-2 text-cyan-300">
-              <span className="text-xs">Découvrir</span>
-              <ArrowRight className="h-4 w-4 transform group-hover:translate-x-2 transition-transform" />
-            </div>
-          </div>
-        </button>
-        
-        <button 
-          onClick={() => setCurrentView('analyze')}
-          className="group relative p-8 bg-gradient-to-br from-purple-500/20 to-pink-600/20 rounded-2xl border border-purple-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/25 overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
-          <div className="relative">
-            <Brain className="h-12 w-12 mx-auto mb-4 text-purple-400 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-xl font-bold mb-3">Analyser Texte</h3>
-            <p className="text-purple-100 text-sm leading-relaxed">IA émotionnelle avec détection de sentiments</p>
-            <div className="mt-4 flex items-center justify-center space-x-2 text-purple-300">
-              <span className="text-xs">Analyser</span>
-              <ArrowRight className="h-4 w-4 transform group-hover:translate-x-2 transition-transform" />
-            </div>
-          </div>
-        </button>
-
-        <button 
-          onClick={() => setCurrentView('training')}
-          className="group relative p-8 bg-gradient-to-br from-orange-500/20 to-red-600/20 rounded-2xl border border-orange-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/25 overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
-          <div className="relative">
-            <Target className="h-12 w-12 mx-auto mb-4 text-orange-400 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-xl font-bold mb-3">Entraîner Modèles</h3>
-            <p className="text-orange-100 text-sm leading-relaxed">Créez vos propres modèles ML personnalisés</p>
-            <div className="mt-4 flex items-center justify-center space-x-2 text-orange-300">
-              <span className="text-xs">Entraîner</span>
-              <ArrowRight className="h-4 w-4 transform group-hover:translate-x-2 transition-transform" />
-            </div>
-          </div>
-        </button>
-
-        <button 
-          onClick={() => setCurrentView('pipeline')}
-          className="group relative p-8 bg-gradient-to-br from-green-500/20 to-teal-600/20 rounded-2xl border border-green-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/25 overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-teal-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
-          <div className="relative">
-            <Layers className="h-12 w-12 mx-auto mb-4 text-green-400 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-xl font-bold mb-3">Pipeline NLP</h3>
-            <p className="text-green-100 text-sm leading-relaxed">Visualisation complète des étapes ML</p>
-            <div className="mt-4 flex items-center justify-center space-x-2 text-green-300">
-              <span className="text-xs">Explorer</span>
-              <ArrowRight className="h-4 w-4 transform group-hover:translate-x-2 transition-transform" />
-            </div>
-          </div>
-        </button>
-      </div>
-
-      {/* Nouvelle section Embeddings avec design premium */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-xl"></div>
-        <div className="relative bg-slate-800/50 backdrop-blur-xl p-12 rounded-3xl border border-white/10">
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <div className="relative">
-                <Network className="h-12 w-12 text-indigo-400 animate-pulse" />
-                <div className="absolute inset-0 bg-indigo-400 rounded-full blur-lg opacity-30"></div>
-              </div>
-              <h2 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Embeddings & IA Sémantique
-              </h2>
-              <div className="relative">
-                <Search className="h-12 w-12 text-pink-400 animate-pulse" />
-                <div className="absolute inset-0 bg-pink-400 rounded-full blur-lg opacity-30"></div>
-              </div>
-            </div>
-            <p className="text-white/80 text-xl max-w-4xl mx-auto leading-relaxed">
-              🚀 <strong>Nouveauté v3.0</strong> : Transformez vos textes en vecteurs intelligents avec TF-IDF, 
-              explorez les relations sémantiques et découvrez des insights cachés dans vos données
-            </p>
-            <div className="flex items-center justify-center space-x-6 mt-6">
-              <div className="flex items-center space-x-2 text-indigo-400 bg-indigo-500/20 px-4 py-2 rounded-full border border-indigo-500/30">
-                <Zap className="h-4 w-4" />
-                <span className="font-medium">Vectorisation TF-IDF</span>
-              </div>
-              <div className="flex items-center space-x-2 text-purple-400 bg-purple-500/20 px-4 py-2 rounded-full border border-purple-500/30">
-                <Eye className="h-4 w-4" />
-                <span className="font-medium">Visualisation 2D/3D</span>
-              </div>
-              <div className="flex items-center space-x-2 text-pink-400 bg-pink-500/20 px-4 py-2 rounded-full border border-pink-500/30">
-                <Search className="h-4 w-4" />
-                <span className="font-medium">Recherche Sémantique</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <button 
-              onClick={() => setCurrentView('embeddings_hub')}
-              className="group relative p-6 bg-gradient-to-br from-indigo-500/20 to-purple-600/20 rounded-2xl border border-indigo-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/25 overflow-hidden col-span-2"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
-              <div className="relative text-center">
-                <div className="flex items-center justify-center space-x-4 mb-4">
-                  <Network className="h-12 w-12 text-indigo-400 group-hover:scale-110 transition-transform duration-300" />
-                  <Eye className="h-12 w-12 text-teal-400 group-hover:scale-110 transition-transform duration-300" />
-                  <Search className="h-12 w-12 text-rose-400 group-hover:scale-110 transition-transform duration-300" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3">Hub Embeddings Unifié</h3>
-                <p className="text-indigo-100 text-lg leading-relaxed">
-                  🎯 Tout-en-un : Entraînement TF-IDF, Visualisation 2D et Recherche sémantique dans une seule page fluide
-                </p>
-                <div className="mt-4 flex items-center justify-center space-x-6">
-                  <div className="flex items-center space-x-2 text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
-                    <Network className="h-4 w-4" />
-                    <span className="text-sm font-medium">Entraînement</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-teal-300 bg-teal-500/20 px-3 py-1 rounded-full">
-                    <Eye className="h-4 w-4" />
-                    <span className="text-sm font-medium">Visualisation</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-rose-300 bg-rose-500/20 px-3 py-1 rounded-full">
-                    <Search className="h-4 w-4" />
-                    <span className="text-sm font-medium">Recherche</span>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center justify-center space-x-2 text-indigo-300">
-                  <span className="text-lg">Accéder au Hub</span>
-                  <ArrowRight className="h-5 w-5 transform group-hover:translate-x-2 transition-transform" />
-                </div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => setCurrentView('autoencoder_training')}
-              className="group relative p-6 bg-gradient-to-br from-orange-500/20 to-red-600/20 rounded-2xl border border-orange-500/30 text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/25 overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
-              <div className="relative text-center">
-                <div className="flex items-center justify-center mb-4">
-                  <Brain className="h-12 w-12 text-orange-400 group-hover:scale-110 transition-transform duration-300" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">🤖 Autoencoder</h3>
-                <p className="text-orange-100 text-sm leading-relaxed mb-4">
-                  Réseau de neurones pour compression intelligente TF-IDF → 32D → TF-IDF
-                </p>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center space-x-2 text-orange-300 bg-orange-500/20 px-2 py-1 rounded-full">
-                    <span>✨ Étapes 3 & 4</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-orange-300 bg-orange-500/20 px-2 py-1 rounded-full">
-                    <span>🔧 X → X Training</span>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center justify-center space-x-2 text-orange-300">
-                  <span className="text-sm">Entraîner</span>
-                  <ArrowRight className="h-4 w-4 transform group-hover:translate-x-2 transition-transform" />
-                </div>
-              </div>
-            </button>
-          </div>
-
-
-        </div>
-      </div>
-
-      {/* Statistiques avec animations - Mise à jour v3.0 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-6 max-w-6xl mx-auto">
-        {[
-          { number: "4M", label: "Avis Amazon", icon: Database, color: "text-cyan-400", bg: "bg-cyan-500/20", desc: "Dataset réel" },
-          { number: "TF-IDF", label: "Vectorisation", icon: Network, color: "text-indigo-400", bg: "bg-indigo-500/20", desc: "Embeddings" },
-          { number: "2D/3D", label: "Visualisations", icon: Eye, color: "text-purple-400", bg: "bg-purple-500/20", desc: "PCA • t-SNE" },
-          { number: "96%", label: "Précision IA", icon: Award, color: "text-yellow-400", bg: "bg-yellow-500/20", desc: "Sentiment" },
-          { number: "25ms", label: "Temps Réponse", icon: Zap, color: "text-green-400", bg: "bg-green-500/20", desc: "Ultra-rapide" }
-        ].map((stat, index) => (
-          <div key={index} className={`${stat.bg} backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:scale-105 transition-all duration-300 group relative overflow-hidden`}>
-            {/* Effet de brillance au hover */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-            <div className="relative">
-              <stat.icon className={`h-8 w-8 ${stat.color} mx-auto mb-3 group-hover:scale-110 transition-transform`} />
-              <div className={`text-2xl font-bold ${stat.color} mb-1`}>{stat.number}</div>
-              <div className="text-white/80 text-sm font-medium mb-1">{stat.label}</div>
-              <div className="text-white/50 text-xs">{stat.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Call to action */}
-      <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-xl p-8 rounded-2xl border border-white/10 max-w-4xl mx-auto">
-        <h2 className="text-3xl font-bold text-white mb-4">Prêt à explorer l'IA émotionnelle ?</h2>
-        <p className="text-white/70 text-lg mb-6">Découvrez comment notre pipeline NLP révolutionnaire analyse les sentiments avec une précision inégalée</p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={() => setCurrentView('explore')}
-            className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg"
-          >
-            Commencer l'Exploration
-          </button>
-          <button
-            onClick={() => setCurrentView('pipeline')}
-            className="px-8 py-4 bg-white/10 text-white rounded-xl font-semibold hover:bg-white/20 transition-colors border border-white/20"
-          >
-            Voir le Pipeline
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 
   // Rendu de l'explorateur avec design amélioré
   const renderExplore = () => (
@@ -883,9 +851,88 @@ function App() {
     </div>
   );
 
-  // Rendu de l'entraînement de modèles
+  // Rendu de l'entraînement de modèles avec onglets
   const renderTraining = () => (
-    <BERTTraining reviews={reviews} />
+    <div className="space-y-6">
+      {/* Header avec onglets */}
+      <div className="bg-slate-800/90 backdrop-blur-xl rounded-xl p-6 border border-slate-600/30">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-2">Entraînement de Modèles</h2>
+            <p className="text-slate-300">Choisissez le type de modèle à entraîner</p>
+          </div>
+        </div>
+
+        {/* Onglets de navigation */}
+        <div className="flex space-x-2 mb-6">
+          <button
+            onClick={() => setTrainingTab('bert')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+              trainingTab === 'bert'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🤖 BERT Training
+          </button>
+          <button
+            onClick={() => setTrainingTab('rnn')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+              trainingTab === 'rnn'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🧠 RNN from Scratch
+          </button>
+          <button
+            onClick={() => setTrainingTab('autoencoder')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+              trainingTab === 'autoencoder'
+                ? 'bg-green-600 text-white shadow-lg'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🔄 Autoencoder Avancé
+          </button>
+        </div>
+
+        {/* Description de l'onglet actuel */}
+        <div className="bg-slate-700/50 rounded-lg p-4">
+          {trainingTab === 'bert' && (
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+              <p className="text-slate-200">
+                <strong>BERT Training:</strong> Entraînez des modèles BERT pour la classification de sentiments avec fine-tuning sur le dataset Amazon.
+              </p>
+            </div>
+          )}
+          {trainingTab === 'rnn' && (
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+              <p className="text-slate-200">
+                <strong>RNN from Scratch:</strong> Implémentation complète d'un RNN from scratch avec PyTorch.
+              </p>
+            </div>
+          )}
+          {trainingTab === 'autoencoder' && (
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+              <p className="text-slate-200">
+                <strong>Autoencoder Avancé:</strong> Entraînement d'autoencodeurs avec régularisation, dropout et techniques avancées.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Contenu de l'onglet */}
+      <div>
+        {trainingTab === 'bert' && <BERTTraining reviews={reviews} />}
+        {trainingTab === 'rnn' && <RNNTraining isVisible={true} />}
+        {trainingTab === 'autoencoder' && <AutoencoderTraining />}
+      </div>
+    </div>
   );
 
   // Rendu des résultats avec design amélioré (NLTK + BERT)
@@ -897,6 +944,11 @@ function App() {
     const nlpResults = realNLPResults;
     
     if (!results) return null;
+
+    // Déterminer quelle source utiliser pour l'affichage
+    const displaySentiment = nlpResults?.comparison?.finalSentiment || nlpResults?.nltk?.sentiment || results.sentiment.label;
+    const displayConfidence = nlpResults?.comparison?.nltkConfidence || nlpResults?.nltk?.confidence || results.sentiment.confidence;
+    const displayPolarity = nlpResults?.nltk?.polarity || results.sentiment.polarity;
 
     const getSentimentColor = (label: string) => {
       switch (label) {
@@ -957,10 +1009,10 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                           <div className="text-center">
                 <div className="text-8xl mb-4">
-                  {getSentimentEmoji(results.sentiment.label, results.sentiment.polarity)}
+                  {getSentimentEmoji(displaySentiment, displayPolarity)}
                 </div>
-                <div className={`text-4xl font-bold ${getSentimentColor(results.sentiment.label)} mb-2`}>
-                  {results.sentiment.label.toUpperCase()}
+                <div className={`text-4xl font-bold ${getSentimentColor(displaySentiment)} mb-2`}>
+                  {displaySentiment.toUpperCase()}
                 </div>
                 <div className="text-white/60 text-lg">
                   {nlpResults?.comparison ? 'Sentiment final (NLTK+BERT)' : 'Sentiment détecté'}
@@ -969,24 +1021,26 @@ function App() {
             
             <div className="text-center">
               <div className="text-6xl font-bold text-white mb-2">
-                {(analysisResults.sentiment.confidence * 100).toFixed(0)}%
+                {(displayConfidence * 100).toFixed(0)}%
               </div>
-              <div className="text-white/60 text-lg">Confiance</div>
+              <div className="text-white/60 text-lg">
+                Confiance {nlpResults ? '(NLTK)' : ''}
+              </div>
               <div className="mt-2 w-full bg-white/20 rounded-full h-3">
                 <div 
                   className="bg-gradient-to-r from-cyan-400 to-blue-500 h-3 rounded-full transition-all duration-1000"
-                  style={{ width: `${analysisResults.sentiment.confidence * 100}%` }}
+                  style={{ width: `${displayConfidence * 100}%` }}
                 />
               </div>
             </div>
             
             <div className="text-center">
-              <div className={`text-6xl font-bold ${getSentimentColor(analysisResults.sentiment.label)} mb-2`}>
-                {analysisResults.sentiment.polarity.toFixed(2)}
+              <div className={`text-6xl font-bold ${getSentimentColor(displaySentiment)} mb-2`}>
+                {displayPolarity.toFixed(2)}
               </div>
               <div className="text-white/60 text-lg">Score de polarité</div>
               <div className="text-white/50 text-sm mt-1">
-                {analysisResults.sentiment.polarity > 0 ? 'Positif' : analysisResults.sentiment.polarity < 0 ? 'Négatif' : 'Neutre'}
+                {displayPolarity > 0 ? 'Positif' : displayPolarity < 0 ? 'Négatif' : 'Neutre'}
               </div>
             </div>
           </div>
@@ -1010,6 +1064,118 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Résultats détaillés NLTK + BERT */}
+        {nlpResults && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Résultats NLTK */}
+            <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                <h3 className="text-blue-400 font-bold text-lg">Analyse NLTK VADER</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-white/70">Sentiment:</span>
+                  <span className={`font-bold ${getSentimentColor(nlpResults.nltk.sentiment)}`}>
+                    {nlpResults.nltk.sentiment}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/70">Confiance:</span>
+                  <span className="text-white font-bold">{(nlpResults.nltk.confidence * 100).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/70">Polarité:</span>
+                  <span className="text-white font-bold">{nlpResults.nltk.polarity.toFixed(3)}</span>
+                </div>
+                {nlpResults.nltk.scores && (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-white/60 text-sm font-medium">Scores détaillés:</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-green-400">Positif:</span>
+                        <span className="text-white">{nlpResults.nltk.scores.pos.toFixed(3)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-red-400">Négatif:</span>
+                        <span className="text-white">{nlpResults.nltk.scores.neg.toFixed(3)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-yellow-400">Neutre:</span>
+                        <span className="text-white">{nlpResults.nltk.scores.neu.toFixed(3)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-purple-400">Composé:</span>
+                        <span className="text-white">{nlpResults.nltk.scores.compound.toFixed(3)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Résultats BERT */}
+            {nlpResults.bert ? (
+              <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                  <h3 className="text-purple-400 font-bold text-lg">Analyse BERT</h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-white/70">Sentiment:</span>
+                    <span className={`font-bold ${getSentimentColor(nlpResults.bert.sentiment)}`}>
+                      {nlpResults.bert.sentiment}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/70">Confiance:</span>
+                    <span className="text-white font-bold">{(nlpResults.bert.confidence * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/70">Classe:</span>
+                    <span className="text-white font-bold">{nlpResults.bert.class}</span>
+                  </div>
+                </div>
+
+                {/* Comparaison */}
+                {nlpResults.comparison && (
+                  <div className="mt-4 p-3 bg-white/10 rounded-lg">
+                    <div className="text-white/60 text-sm font-medium mb-2">Comparaison:</div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${nlpResults.comparison.agreement ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                        <span className="text-white/80">
+                          {nlpResults.comparison.agreement ? 'Accord' : 'Désaccord'} NLTK-BERT
+                        </span>
+                      </div>
+                      <div className="text-white/60 mt-2">
+                        {nlpResults.comparison.reasoning}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-500/20 border border-gray-500/30 rounded-xl p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                  <h3 className="text-gray-400 font-bold text-lg">BERT Non Disponible</h3>
+                </div>
+                <p className="text-white/60 text-sm">
+                  Aucun modèle BERT n'est actuellement chargé. L'analyse se base uniquement sur NLTK VADER.
+                </p>
+                <button
+                  onClick={() => setCurrentView('training')}
+                  className="mt-3 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30 transition-colors"
+                >
+                  Entraîner un modèle BERT
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions avec design moderne */}
         <div className="flex flex-col sm:flex-row gap-4">
@@ -1037,93 +1203,390 @@ function App() {
     );
   };
 
+  // Composant Sidebar avec navigation hiérarchique
+  const renderSidebar = () => (
+    <>
+      {/* Overlay pour mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar redimensionnable */}
+      <div 
+        className={`
+          fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900/98 via-slate-900/95 to-slate-800/98 backdrop-blur-xl border-r border-cyan-500/20 z-50 transform transition-all duration-500 overflow-hidden shadow-2xl shadow-cyan-500/10 flex flex-col
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+        style={{ width: '320px' }}
+      >
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 pointer-events-none"></div>
+        
+        {/* Header sidebar */}
+        <div className="relative p-6 border-b border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 to-purple-500/10">
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                NLP Platform
+              </h2>
+              <p className="text-sm text-cyan-300/80 font-medium">Navigation Complète</p>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 hover:bg-cyan-500/20 rounded-xl transition-all duration-300 border border-transparent hover:border-cyan-500/30"
+            >
+              <X className="h-5 w-5 text-cyan-300 hover:text-white transition-colors" />
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation avec scrollbar stylisée */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-slate-800/50 scrollbar-thumb-cyan-500/30 hover:scrollbar-thumb-cyan-500/50 scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
+          <div className="p-4 space-y-2">
+            {sidebarSections.map((section) => {
+                const SectionIcon = section.icon;
+                const isExpanded = expandedSections.includes(section.id);
+                
+                return (
+                  <div key={section.id} className="space-y-1">
+                    {/* Section Header */}
+                    <button
+                      onClick={() => toggleSection(section.id)}
+                      className={`
+                        w-full flex items-center justify-between p-4 rounded-xl transition-all duration-300 group relative overflow-hidden
+                        ${isExpanded 
+                          ? `bg-gradient-to-r from-${section.color}-500/20 to-${section.color}-400/10 border border-${section.color}-500/40 shadow-lg shadow-${section.color}-500/20` 
+                          : 'hover:bg-gradient-to-r hover:from-white/5 hover:to-white/10 border border-transparent hover:border-white/20'
+                        }
+                      `}
+                    >
+                      {/* Effet de brillance */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                      
+                      <div className="relative flex items-center space-x-3">
+                        {SectionIcon && (
+                          <div className={`p-2 rounded-lg bg-${section.color}-500/20 group-hover:scale-110 transition-transform duration-300`}>
+                            <SectionIcon className={`h-5 w-5 text-${section.color}-400 group-hover:text-${section.color}-300 transition-colors`} />
+                          </div>
+                        )}
+                        <span className="text-white font-semibold text-sm group-hover:text-white/90 transition-colors">{section.title}</span>
+                      </div>
+                      <div className="relative">
+                        {isExpanded ? (
+                          <ChevronUp className={`h-4 w-4 text-${section.color}-400 group-hover:rotate-180 transition-all duration-300`} />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-white/60 group-hover:text-white/80 transition-colors" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Section Items */}
+                    {isExpanded && (
+                      <div className="ml-6 space-y-2 border-l-2 border-gradient-to-b from-cyan-500/30 to-purple-500/30 pl-4 relative">
+                        {/* Ligne de connexion animée */}
+                        <div className={`absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-${section.color}-500/50 to-${section.color}-400/20 rounded-full`}></div>
+                        
+                        {section.items.map((item, itemIndex) => {
+                          const ItemIcon = item.icon;
+                          const isActive = currentView === item.id;
+                          
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                setCurrentView(item.id);
+                                setSidebarOpen(false); // Fermer sur mobile
+                              }}
+                              className={`
+                                w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 text-left group relative overflow-hidden
+                                ${isActive 
+                                  ? `bg-gradient-to-r from-${section.color}-500/25 to-${section.color}-400/15 border border-${section.color}-500/50 shadow-md shadow-${section.color}-500/20 scale-105` 
+                                  : 'text-white/70 hover:text-white hover:bg-gradient-to-r hover:from-white/5 hover:to-white/10 hover:border-white/20 border border-transparent hover:scale-102'
+                                }
+                              `}
+                              style={{
+                                animationDelay: `${itemIndex * 100}ms`
+                              }}
+                            >
+                              {/* Effet de brillance pour les éléments actifs */}
+                              {isActive && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-pulse"></div>
+                              )}
+                              
+                              <div className="relative flex items-center space-x-3 flex-1 min-w-0">
+                                <div className={`p-2 rounded-lg transition-all duration-300 ${
+                                  isActive 
+                                    ? `bg-${section.color}-500/30 scale-110` 
+                                    : 'bg-white/10 group-hover:bg-white/20 group-hover:scale-110'
+                                }`}>
+                                  <ItemIcon className={`h-4 w-4 transition-colors ${
+                                    isActive 
+                                      ? `text-${section.color}-300` 
+                                      : 'text-white/60 group-hover:text-white/80'
+                                  }`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-semibold transition-colors ${
+                                    isActive 
+                                      ? `text-${section.color}-300` 
+                                      : 'text-white/80 group-hover:text-white'
+                                  }`}>
+                                    {item.title}
+                                  </div>
+                                  <div className="text-xs text-white/50 truncate group-hover:text-white/60 transition-colors">
+                                    {item.description}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Bouton Info */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openInfoPopup(item.id);
+                                }}
+                                className="p-2 rounded-lg hover:bg-white/10 transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110"
+                                title="Plus d'informations"
+                              >
+                                <Info className="h-4 w-4 text-white/60 hover:text-blue-400 transition-colors" />
+                              </button>
+                              
+                              {/* Indicateur d'activité */}
+                              {isActive && (
+                                <div className={`w-2 h-2 rounded-full bg-${section.color}-400 animate-pulse`}></div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+
+
+      </div>
+    </>
+  );
+
   // Composant Header uniforme et compact
   const renderHeader = () => (
-    <header className="bg-slate-900/95 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="lg:hidden bg-slate-900/95 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40">
+      <div className="px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
-          {/* Logo compact */}
+          {/* Menu burger pour mobile */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <Menu className="h-5 w-5 text-white/70" />
+          </button>
+          
+          {/* Logo mobile */}
           <button 
             onClick={() => setCurrentView('home')}
-            className="flex items-center space-x-2 hover:opacity-80 transition-opacity group"
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
           >
             <div className="relative">
               <Brain className="h-6 w-6 text-cyan-400 animate-pulse" />
               <div className="absolute inset-0 bg-cyan-400 rounded-full blur-md opacity-30"></div>
             </div>
-            <div className="flex flex-col">
               <span className="text-lg font-bold text-white">NLP Amazon</span>
-              <span className="text-xs text-cyan-400 font-medium">Analysis Platform</span>
-            </div>
           </button>
 
-          {/* Navigation principale compacte */}
-          <nav className="hidden md:flex items-center space-x-1">
-            {[
-              { id: 'home', label: 'Accueil', icon: Home },
-              { id: 'explore', label: 'Dataset', icon: Database },
-              { id: 'analyze', label: 'Analyser', icon: Brain },
-              { id: 'training', label: 'Entraîner', icon: Target },
-              { id: 'pipeline', label: 'Pipeline', icon: Layers },
-              { id: 'autoencoder_training', label: 'Autoencoder', icon: Brain }
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setCurrentView(item.id)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
-                  currentView === item.id
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                <span className="font-medium">{item.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          {/* Menu embeddings compact */}
-          <div className="hidden lg:flex items-center space-x-2">
-            <div className="w-px h-6 bg-white/20"></div>
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={() => setCurrentView('embeddings_hub')}
-                className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 text-sm ${
-                  currentView === 'embeddings_hub'
-                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                    : 'text-indigo-400/70 hover:text-indigo-400 hover:bg-white/5'
-                }`}
-              >
-                <Network className="h-4 w-4" />
-                <span className="font-medium">Hub Embeddings</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Indicateurs de statut compacts */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 px-2 py-1 rounded-full border border-green-500/30">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium">Live</span>
-            </div>
-            {reviews.length > 0 && (
-              <div className="text-white/60 text-xs font-medium">
-                {reviews.length} avis
-              </div>
-            )}
+          {/* Statut live */}
+          <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 px-2 py-1 rounded-full border border-green-500/30">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-xs font-medium">Live</span>
           </div>
         </div>
       </div>
     </header>
   );
 
+  // Rendu de la vue Code & API Explorer
+  const renderCodeExplorer = () => (
+    <div className="space-y-8">
+      <div className="text-center mb-12">
+        <div className="flex items-center justify-center space-x-4 mb-6">
+          <Code2 className="h-16 w-16 text-slate-400 animate-pulse" />
+          <div className="text-left">
+            <h1 className="text-4xl font-bold text-white mb-2">Code & API Explorer</h1>
+            <p className="text-slate-300 text-lg">Explorez le code source et testez les 30+ endpoints API</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-center space-x-6 mt-6">
+          <div className="flex items-center space-x-2 text-slate-400 bg-slate-500/20 px-4 py-2 rounded-full border border-slate-500/30">
+            <FileText className="h-4 w-4" />
+            <span className="font-medium">Code Source</span>
+          </div>
+          <div className="flex items-center space-x-2 text-blue-400 bg-blue-500/20 px-4 py-2 rounded-full border border-blue-500/30">
+            <Globe className="h-4 w-4" />
+            <span className="font-medium">API REST</span>
+          </div>
+          <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 px-4 py-2 rounded-full border border-green-500/30">
+            <CheckCircle className="h-4 w-4" />
+            <span className="font-medium">Tests Interactifs</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Sélecteur de module */}
+      <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-6 border border-slate-600/30">
+        <h3 className="text-xl font-semibold text-white mb-4">Sélectionner un Module</h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { id: 'rnn', title: 'RNN from Scratch', icon: Brain, color: 'purple', desc: 'PyTorch + TensorFlow' },
+            { id: 'bert', title: 'BERT Training', icon: Target, color: 'blue', desc: 'Hugging Face' },
+            { id: 'autoencoder', title: 'Autoencoder', icon: Layers, color: 'green', desc: 'Compression' },
+            { id: 'embeddings', title: 'Embeddings', icon: Network, color: 'cyan', desc: 'TF-IDF + Search' }
+          ].map((module) => (
+              <button
+              key={module.id}
+              onClick={() => {
+                setCodeViewerStep(module.id);
+                setShowCodeViewer(true);
+              }}
+              className={`group p-4 rounded-xl border transition-all duration-300 hover:scale-105 bg-${module.color}-500/10 border-${module.color}-500/30 hover:bg-${module.color}-500/20`}
+            >
+              <module.icon className={`h-8 w-8 text-${module.color}-400 mx-auto mb-3 group-hover:scale-110 transition-transform`} />
+              <h4 className="font-semibold text-white mb-1">{module.title}</h4>
+              <p className="text-sm text-gray-400">{module.desc}</p>
+              <div className="mt-3 flex items-center justify-center space-x-2 text-xs">
+                <Code2 className="h-3 w-3" />
+                <span className={`text-${module.color}-400`}>Voir le code</span>
+              </div>
+              </button>
+            ))}
+            </div>
+          </div>
+
+      {/* API Endpoints */}
+      <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-6 border border-slate-600/30">
+        <h3 className="text-xl font-semibold text-white mb-6">API Endpoints Disponibles</h3>
+        
+        <div className="grid gap-4">
+          {/* Endpoints par catégorie */}
+          {[
+            {
+              category: 'BERT Training',
+              color: 'blue',
+              endpoints: [
+                { method: 'POST', path: '/api/train/bert', desc: 'Entraîner un modèle BERT' },
+                { method: 'GET', path: '/api/models', desc: 'Liste des modèles disponibles' },
+                { method: 'POST', path: '/api/predict/bert/{id}', desc: 'Prédiction avec BERT' }
+              ]
+            },
+            {
+              category: 'RNN from Scratch',
+              color: 'purple',
+              endpoints: [
+                { method: 'POST', path: '/api/rnn/train', desc: 'Entraîner RNN PyTorch' },
+                { method: 'POST', path: '/api/rnn/predict', desc: 'Prédiction RNN' },
+                { method: 'GET', path: '/api/rnn/info', desc: 'Informations du modèle' }
+              ]
+            },
+            {
+              category: 'Embeddings & TF-IDF',
+              color: 'cyan',
+              endpoints: [
+                { method: 'POST', path: '/api/embeddings/train/tfidf', desc: 'Entraîner TF-IDF' },
+                { method: 'POST', path: '/api/embeddings/search', desc: 'Recherche sémantique' },
+                { method: 'POST', path: '/api/embeddings/visualize', desc: 'Visualisation 2D/3D' }
+              ]
+            },
+            {
+              category: 'Autoencoder',
+              color: 'green',
+              endpoints: [
+                { method: 'POST', path: '/api/autoencoder/train', desc: 'Entraîner autoencoder' },
+                { method: 'POST', path: '/api/autoencoder/encode', desc: 'Encoder des textes' },
+                { method: 'POST', path: '/api/autoencoder/clustering', desc: 'Clustering avancé' }
+              ]
+            }
+          ].map((category, idx) => (
+            <div key={idx} className={`bg-${category.color}-500/10 border border-${category.color}-500/30 rounded-xl p-4`}>
+              <h4 className={`font-semibold text-${category.color}-400 mb-3`}>{category.category}</h4>
+              <div className="space-y-2">
+                {category.endpoints.map((endpoint, endIdx) => (
+                  <div key={endIdx} className="flex items-center justify-between bg-slate-700/50 rounded-lg p-3">
+          <div className="flex items-center space-x-3">
+                      <span className={`px-2 py-1 text-xs font-mono rounded bg-${category.color}-500/20 text-${category.color}-400`}>
+                        {endpoint.method}
+                      </span>
+                      <code className="text-white font-mono text-sm">{endpoint.path}</code>
+            </div>
+                    <span className="text-gray-400 text-sm">{endpoint.desc}</span>
+              </div>
+                ))}
+          </div>
+        </div>
+          ))}
+      </div>
+      </div>
+
+      {/* Statistiques du projet */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { number: "30+", label: "Endpoints API", icon: Globe, color: "text-blue-400", bg: "bg-blue-500/20" },
+          { number: "2000+", label: "Lignes de Code", icon: Code2, color: "text-green-400", bg: "bg-green-500/20" },
+          { number: "5", label: "Services ML", icon: Brain, color: "text-purple-400", bg: "bg-purple-500/20" },
+          { number: "React", label: "Frontend", icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-500/20" }
+        ].map((stat, index) => (
+          <div key={index} className={`${stat.bg} backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:scale-105 transition-all duration-300 group relative overflow-hidden`}>
+            <div className="relative text-center">
+              <stat.icon className={`h-8 w-8 ${stat.color} mx-auto mb-3 group-hover:scale-110 transition-transform`} />
+              <div className={`text-2xl font-bold ${stat.color} mb-1`}>{stat.number}</div>
+              <div className="text-white/80 text-sm font-medium">{stat.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <button
+          onClick={() => {
+            setCodeViewerStep('rnn');
+            setShowCodeViewer(true);
+          }}
+          className="px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-semibold transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2"
+        >
+          <Code2 className="h-5 w-5" />
+          <span>Explorer le Code RNN</span>
+        </button>
+        <button
+          onClick={() => setCurrentView('home')}
+          className="px-8 py-4 bg-white/10 text-white rounded-xl font-semibold hover:bg-white/20 transition-colors border border-white/20"
+        >
+          Retour au Guide
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+      {/* Sidebar */}
+      {renderSidebar()}
+      
+      {/* Contenu principal avec offset pour sidebar redimensionnable */}
+      <div 
+        className="transition-all duration-300"
+        style={{ marginLeft: sidebarOpen || window.innerWidth >= 1024 ? '320px' : '0' }}
+      >
       {/* Header uniforme pour toutes les pages */}
       {renderHeader()}
 
       {/* Contenu principal */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <main className="px-4 sm:px-6 lg:px-8 py-12">
+
         {isLoading && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-slate-800/90 backdrop-blur-xl p-10 rounded-2xl border border-white/20 text-center shadow-2xl">
@@ -1138,6 +1601,7 @@ function App() {
         )}
 
         {currentView === 'home' && renderHome()}
+        {currentView === 'simple_autoencoder' && <SimpleAutoencoder />}
         {currentView === 'explore' && renderExplore()}
         {currentView === 'analyze' && renderAnalyze()}
         {currentView === 'training' && renderTraining()}
@@ -1145,6 +1609,39 @@ function App() {
         {currentView === 'results' && renderResults()}
         {currentView === 'embeddings_hub' && <EmbeddingHub onClose={() => setCurrentView('home')} />}
         {currentView === 'autoencoder_training' && <AutoencoderTraining />}
+        {currentView === 'code' && renderCodeExplorer()}
+        
+        {/* Nouvelles vues pour toutes les fonctionnalités */}
+        {currentView === 'bert_training' && <BERTTraining reviews={reviews} />}
+        {currentView === 'rnn_training' && <RNNTraining />}
+        {currentView === 'embedding_training' && <EmbeddingTraining />}
+        {currentView === 'embedding_simple' && <EmbeddingTrainingSimple />}
+        {currentView === 'embedding_visualizer' && <EmbeddingVisualizer />}
+        {currentView === 'semantic_search' && <SemanticSearch />}
+        {currentView === 'nlp_pipeline' && <NLPPipeline text={textToAnalyze || "Entrez votre texte ici..."} onComplete={handlePipelineComplete} />}
+        {currentView === 'code_viewer' && showCodeViewer && <CodeViewer stepId={codeViewerStep} isVisible={true} />}
+
+        {/* Modal CodeViewer */}
+        {showCodeViewer && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-600/30 max-w-6xl w-full max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-slate-600/30">
+                <h2 className="text-2xl font-bold text-white">Code Source - {codeViewerStep}</h2>
+                <button
+                  onClick={() => setShowCodeViewer(false)}
+                  className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+                >
+                  <AlertCircle className="h-6 w-6 text-slate-400" />
+                </button>
+              </div>
+                             <div className="overflow-y-auto max-h-[calc(90vh-100px)]">
+                 <CodeViewer stepId={codeViewerStep} isVisible={true} />
+               </div>
+            </div>
+          </div>
+        )}
+
+
 
       </main>
 
@@ -1166,6 +1663,14 @@ function App() {
           </div>
         </div>
       </footer>
+      </div>
+      
+      {/* Popup d'information */}
+      <InfoPopup 
+        isOpen={showInfoPopup}
+        onClose={closeInfoPopup}
+        stepId={infoStepId}
+      />
     </div>
   );
 }

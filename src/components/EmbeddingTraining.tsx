@@ -26,6 +26,10 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
   const [serviceAvailable, setServiceAvailable] = useState<boolean>(false);
   const [existingModels, setExistingModels] = useState<EmbeddingModel[]>([]);
 
+  const [datasetSize, setDatasetSize] = useState<number>(5000);
+  const [maxDatasetSize, setMaxDatasetSize] = useState<number>(3600000); // 3.6M échantillons disponibles
+  const [useRandomSample, setUseRandomSample] = useState<boolean>(true);
+
   // Vérifier la disponibilité du service
   useEffect(() => {
     const checkService = async () => {
@@ -73,10 +77,11 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
       let texts: string[] = [];
 
       if (trainingData === 'amazon') {
-        if (reviews.length === 0) {
-          throw new Error('Dataset Amazon non chargé');
-        }
-        texts = reviews.map(review => review.text);
+        // Charger le dataset avec la taille spécifiée
+        console.log(`🚀 Chargement de ${datasetSize} avis Amazon...`);
+        const loadedReviews = await DatasetLoader.loadAmazonPolarityDataset(datasetSize, useRandomSample);
+        texts = loadedReviews.map(review => review.text);
+        console.log(`✅ ${texts.length} avis chargés pour l'entraînement`);
       } else if (trainingData === 'custom') {
         if (!customTexts.trim()) {
           throw new Error('Veuillez entrer des textes personnalisés');
@@ -90,7 +95,11 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
 
       console.log(`🚀 Démarrage entraînement Word2Vec sur ${texts.length} textes...`);
       
-      const model = await EmbeddingService.trainWord2Vec(texts, config);
+      const model = await EmbeddingService.trainWord2Vec(texts, {
+        ...config,
+        dataset_size: datasetSize,
+        random_sample: useRandomSample
+      });
       setTrainedModel(model);
       
       // Recharger la liste des modèles
@@ -114,6 +123,8 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
       sg: config.sg === 1 ? 'Skip-gram (recommandé)' : 'CBOW (plus rapide)'
     };
   };
+
+
 
   if (!serviceAvailable) {
     return (
@@ -179,10 +190,89 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
                   onChange={(e) => setTrainingData(e.target.value)}
                   className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-cyan-400"
                 >
-                  <option value="amazon">Dataset Amazon (2000 avis)</option>
+                  <option value="amazon">Dataset Amazon (jusqu'à {maxDatasetSize.toLocaleString()} avis)</option>
                   <option value="custom">Textes personnalisés</option>
                 </select>
               </div>
+
+              {/* Configuration du Dataset Amazon */}
+              {trainingData === 'amazon' && (
+                <div className="mb-4 p-4 bg-slate-700/30 rounded-xl">
+                  <h4 className="text-white/90 font-medium mb-3 flex items-center">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configuration du Dataset
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    {/* Sélection de la taille */}
+                    <div>
+                      <label className="block text-white/80 text-sm font-medium mb-2">
+                        Nombre d'avis: {datasetSize.toLocaleString()}
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max={maxDatasetSize}
+                        step="50"
+                        value={datasetSize}
+                        onChange={(e) => setDatasetSize(parseInt(e.target.value))}
+                        className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-white/50 mt-1">
+                        <span>50</span>
+                        <span>1K</span>
+                        <span>3K</span>
+                        <span>{maxDatasetSize.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Boutons de sélection rapide */}
+                    <div className="flex flex-wrap gap-2">
+                      {[100, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, maxDatasetSize].map(size => (
+                        <button
+                          key={size}
+                          onClick={() => setDatasetSize(size)}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                            datasetSize === size
+                              ? 'bg-cyan-500 text-white'
+                              : 'bg-slate-600 text-white/70 hover:bg-slate-500'
+                          }`}
+                        >
+                          {size >= 1000000 ? `${(size/1000000).toFixed(1)}M` : size >= 1000 ? `${(size/1000)}K` : size.toString()}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Options d'échantillonnage */}
+                    <div>
+                      <label className="flex items-center text-white/80 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={useRandomSample}
+                          onChange={(e) => setUseRandomSample(e.target.checked)}
+                          className="rounded border-slate-400 text-cyan-500 focus:ring-cyan-500 mr-2"
+                        />
+                        Échantillonnage aléatoire
+                      </label>
+                      <p className="text-white/50 text-xs mt-1">
+                        Sélectionne aléatoirement les avis pour éviter le biais
+                      </p>
+                    </div>
+
+                    {/* Conseils */}
+                    <div className="text-xs text-white/60 bg-slate-600/30 p-3 rounded-lg">
+                      <p className="font-medium mb-1">💡 Conseils d'utilisation:</p>
+                      <ul className="space-y-1">
+                        <li>• <strong>100-1K:</strong> Tests rapides et prototypage</li>
+                        <li>• <strong>5K-10K:</strong> Entraînement équilibré</li>
+                        <li>• <strong>50K-100K:</strong> Haute qualité (temps modéré)</li>
+                        <li>• <strong>500K+:</strong> Performance maximale (très lent)</li>
+                        <li>• <strong>3.6M:</strong> Dataset complet (plusieurs heures)</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {trainingData === 'amazon' && (
                 <div className="p-4 bg-slate-700/50 rounded-xl">
@@ -398,15 +488,15 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Vocabulaire :</span>
-                      <span className="text-white">{trainedModel.vocabulary_size.toLocaleString()}</span>
+                      <span className="text-white">{trainedModel?.vocabulary_size?.toLocaleString() || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Textes :</span>
-                      <span className="text-white">{trainedModel.trained_on.toLocaleString()}</span>
+                      <span className="text-white">{trainedModel?.trained_on?.toLocaleString() || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Dimensions :</span>
-                      <span className="text-white">{trainedModel.config.vector_size}</span>
+                      <span className="text-white">{trainedModel?.config?.vector_size || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
@@ -440,22 +530,22 @@ export const EmbeddingTraining: React.FC<EmbeddingTrainingProps> = ({ onClose })
                 <span>Modèles Existants</span>
               </h3>
 
-              {existingModels.length === 0 ? (
+              {!existingModels || existingModels.length === 0 ? (
                 <div className="text-center py-6">
                   <Database className="h-8 w-8 text-white/30 mx-auto mb-2" />
                   <p className="text-white/60 text-sm">Aucun modèle disponible</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {existingModels.slice(0, 5).map((model, index) => (
+                  {existingModels.slice(0, 5).filter(model => model).map((model, index) => (
                     <div key={index} className="bg-slate-700/50 p-3 rounded-xl">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-white font-medium text-sm">{model.type}</span>
-                        <span className="text-white/60 text-xs">{model.id}</span>
+                        <span className="text-white font-medium text-sm">{model?.type || 'N/A'}</span>
+                        <span className="text-white/60 text-xs">{model?.id || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-white/50">{model.vocabulary_size} mots</span>
-                        <span className="text-white/50">{model.config.vector_size}D</span>
+                        <span className="text-white/50">{model?.vocabulary_size || 0} mots</span>
+                        <span className="text-white/50">{model?.config?.vector_size || 0}D</span>
                       </div>
                     </div>
                   ))}
