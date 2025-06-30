@@ -430,6 +430,280 @@ def build_regularized_autoencoder(input_dim, encoding_dim, l2_reg, dropout_rates
           }
         ];
 
+      case 'auto_attention':
+        return [
+          {
+            title: 'Code Amélioré - Gestion des Erreurs et CSV',
+            language: 'python',
+            description: 'Version améliorée du code du professeur avec gestion d\'erreurs robuste et chemins CSV automatiques',
+            code: `# Version améliorée du code Auto-Attention du professeur
+class AutoAttentionTrainer:
+    """
+    Classe d'entraînement pour RNN + Self-Attention
+    Version améliorée avec gestion d'erreurs et chemins corrects
+    """
+    
+    def __init__(self):
+        self.vocab = {'<pad>': 0, '<unk>': 1}
+        self.model = None
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"🎯 AutoAttentionTrainer initialisé sur {self.device}")
+    
+    def find_csv_file(self, filename='train.csv') -> str:
+        """
+        Trouve le fichier CSV dans différents emplacements possibles
+        RÉSOUT: Problème de chemin CSV du code original
+        """
+        possible_paths = [
+            f'data/amazon_polarity/{filename}',
+            f'backend/data/amazon_polarity/{filename}',
+            f'../data/amazon_polarity/{filename}',
+            f'./data/amazon_polarity/{filename}'
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"✅ CSV trouvé: {path}")
+                return path
+        
+        raise FileNotFoundError(f"❌ Fichier {filename} non trouvé")
+    
+    def load_data(self, nrows=100000) -> pd.DataFrame:
+        """
+        Charge et prépare le dataset Amazon Polarity
+        RÉSOUT: Erreur de chargement du code original
+        """
+        try:
+            csv_path = self.find_csv_file('train.csv')
+            print(f"📊 Chargement de {nrows} échantillons depuis {csv_path}")
+            
+            df = pd.read_csv(csv_path, nrows=nrows)
+            df = df[['label', 'text']].dropna()
+            
+            # Ajuster les labels: Amazon Polarity utilise 1 et 2, nous voulons 0 et 1
+            df['label'] = df['label'] - 1
+            
+            print(f"✅ Dataset chargé: {len(df)} échantillons")
+            print(f"📊 Distribution: {df['label'].value_counts().to_dict()}")
+            
+            return df
+            
+        except Exception as e:
+            print(f"❌ Erreur lors du chargement des données: {e}")
+            raise`
+          },
+          {
+            title: 'Mécanisme Self-Attention Amélioré',
+            language: 'python',
+            description: 'Implémentation du mécanisme d\'attention avec documentation et gestion d\'erreurs',
+            code: `# Mécanisme Self-Attention pour RNN (Version Améliorée)
+class SelfAttention(nn.Module):
+    """
+    Mécanisme Self-Attention avec Query, Key, Value
+    AMÉLIORATION: Documentation et validation des dimensions
+    """
+    def __init__(self, hidden_dim):
+        super().__init__()
+        self.query = nn.Linear(hidden_dim, hidden_dim)
+        self.key   = nn.Linear(hidden_dim, hidden_dim)
+        self.value = nn.Linear(hidden_dim, hidden_dim)
+        self.scale = hidden_dim ** 0.5
+    
+    def forward(self, x):
+        Q = self.query(x)  # [batch_size, seq_len, hidden_dim]
+        K = self.key(x)    # [batch_size, seq_len, hidden_dim]
+        V = self.value(x)  # [batch_size, seq_len, hidden_dim]
+        
+        # Attention scores: Q × K^T / sqrt(d_k)
+        scores = torch.matmul(Q, K.permute(0, 2, 1)) / self.scale
+        
+        # Apply softmax to get attention weights
+        w = F.softmax(scores, dim=-1)  # [batch_size, seq_len, seq_len]
+        
+        # Apply attention weights to values
+        context = torch.matmul(w, V)  # [batch_size, seq_len, hidden_dim]
+        return context
+
+# RNN Bidirectionnel avec GRU (Version Améliorée)
+class SimpleRNN(nn.Module):
+    """
+    RNN Bidirectionnel avec GRU
+    AMÉLIORATION: Meilleure gestion des états cachés
+    """
+    def __init__(self, input_dim, hidden_dim, bidirectional=False):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
+        
+        # GRU layer (better than vanilla RNN for longer sequences)
+        self.rnn = nn.GRU(
+            input_dim,
+            hidden_dim,
+            batch_first=True,
+            bidirectional=bidirectional
+        )
+        
+    def forward(self, x):
+        # x: [batch_size, seq_len, input_dim]
+        batch_size = x.size(0)
+        
+        # Initialize hidden state
+        h0 = torch.zeros(
+            self.num_directions,
+            batch_size,
+            self.hidden_dim
+        ).to(x.device)
+        
+        # Forward pass through RNN
+        output, hidden = self.rnn(x, h0)
+        return output, hidden
+
+# Modèle complet (Version Améliorée)
+class SentimentClassifier(nn.Module):
+    """
+    Modèle complet RNN + Self-Attention pour classification de sentiment
+    AMÉLIORATION: Stockage des paramètres d'architecture
+    """
+    def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.num_classes = num_classes
+        
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
+        self.encoder = SimpleRNN(embed_dim, hidden_dim, bidirectional=True)
+        self.attn = SelfAttention(hidden_dim * 2)
+        self.fc = nn.Linear(hidden_dim * 2, num_classes)
+    
+    def forward(self, x):
+        emb = self.embedding(x)
+        enc, _ = self.encoder(emb)
+        context = self.attn(enc)
+        pooled = context.mean(dim=1)
+        return self.fc(pooled)`
+          },
+          {
+            title: 'Modèle Complet RNN + Self-Attention',
+            language: 'python',
+            description: 'Architecture complète combinant RNN bidirectionnel et mécanisme d\'attention',
+            code: `# Modèle complet RNN + Self-Attention pour classification de sentiment
+class SentimentClassifier(nn.Module):
+    def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
+        self.encoder = SimpleRNN(embed_dim, hidden_dim, bidirectional=True)
+        self.attn = SelfAttention(hidden_dim * 2)
+        self.fc = nn.Linear(hidden_dim * 2, num_classes)
+    
+    def forward(self, x):
+        emb = self.embedding(x)
+        enc, _ = self.encoder(emb)
+        context = self.attn(enc)
+        pooled = context.mean(dim=1)
+        return self.fc(pooled)
+
+# Dataset personnalisé pour Amazon Polarity
+class SentimentDataset(Dataset):
+    def __init__(self, df, tokenizer, max_len=50):
+        self.texts = df['text'].tolist()
+        self.labels = df['label'].tolist()
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+
+    def __len__(self): 
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        tokens = self.tokenizer(self.texts[idx])
+        tokens = torch.tensor(tokens[:self.max_len], dtype=torch.long)
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
+        return tokens, label
+
+def collate_batch(batch):
+    texts, labels = zip(*batch)
+    texts = pad_sequence(texts, batch_first=True, padding_value=0)
+    labels = torch.stack(labels)
+    return texts, labels`
+          },
+          {
+            title: 'Entraînement et Évaluation',
+            language: 'python',
+            description: 'Boucle d\'entraînement avec métriques temps réel et validation',
+            code: `# Entraînement du modèle RNN + Self-Attention
+def train_model():
+    # Chargement et préparation des données
+    df = pd.read_csv('backend/data/amazon_polarity/train.csv', nrows=100000)
+    df = df[['label', 'text']].dropna()
+    df['label'] = df['label'] - 1  # Ajuster labels: 1,2 → 0,1
+    
+    # Construction du vocabulaire
+    vocab = {'<pad>': 0, '<unk>': 1}
+    def build_vocab(texts, max_vocab_size=30000):
+        word_counts = {}
+        for text in tqdm(texts, desc="Construction du vocabulaire"):
+            for word in text.lower().split():
+                word_counts[word] = word_counts.get(word, 0) + 1
+        
+        sorted_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)
+        for word, _ in sorted_words[:max_vocab_size]:
+            if word not in vocab:
+                vocab[word] = len(vocab)
+    
+    build_vocab(df['text'].tolist())
+    
+    # Tokenizer simple
+    def simple_tokenizer(text):
+        return [vocab.get(w.lower(), vocab['<unk>']) for w in text.split()]
+    
+    # Datasets et DataLoaders
+    train_df, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['label'])
+    train_ds = SentimentDataset(train_df, simple_tokenizer, max_len=50)
+    val_ds = SentimentDataset(val_df, simple_tokenizer, max_len=50)
+    
+    train_loader = DataLoader(train_ds, batch_size=64, shuffle=True, collate_fn=collate_batch)
+    val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, collate_fn=collate_batch)
+    
+    # Modèle et optimiseur
+    VOCAB_SIZE = len(vocab)
+    model = SentimentClassifier(VOCAB_SIZE, embed_dim=100, hidden_dim=128, num_classes=2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.CrossEntropyLoss()
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    
+    # Entraînement
+    for epoch in range(1, 6):  # 5 époques
+        model.train()
+        total_loss = 0
+        for texts, labels in tqdm(train_loader, desc=f"Epoch {epoch}"):
+            texts, labels = texts.to(device), labels.to(device)
+            optimizer.zero_grad()
+            logits = model(texts)
+            loss = criterion(logits, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        
+        avg_loss = total_loss / len(train_loader)
+        print(f"Epoch {epoch} — Loss: {avg_loss:.4f}")
+        
+        # Évaluation
+        model.eval()
+        correct = total = 0
+        with torch.no_grad():
+            for texts, labels in tqdm(val_loader, desc="Validation"):
+                texts, labels = texts.to(device), labels.to(device)
+                logits = model(texts)
+                preds = logits.argmax(dim=1)
+                correct += (preds == labels).sum().item()
+                total += labels.size(0)
+        print(f"Validation Accuracy: {100*correct/total:.2f}%\\n")`
+          }
+        ];
+
       case 'rnn_training':
         return [
           {

@@ -14,6 +14,7 @@ import {
 import { NLPPipeline } from './components/NLPPipeline';
 import { BERTTraining } from './components/BERTTraining';
 import RNNTraining from './components/RNNTraining';
+import AutoAttentionTraining from './components/AutoAttentionTraining';
 import { EmbeddingHub } from './components/EmbeddingHub';
 import { EmbeddingVisualizer } from './components/EmbeddingVisualizer';
 import { SemanticSearch } from './components/SemanticSearch';
@@ -110,6 +111,7 @@ function App() {
       color: 'orange',
       items: [
         { id: 'training', title: 'Hub Entraînement', icon: Target, description: 'BERT, RNN, Autoencoder' },
+        { id: 'auto_attention', title: 'RNN + Self-Attention', icon: Brain, description: 'Modèle hybride avec attention + Code source' },
         { id: 'simple_autoencoder', title: 'Autoencoder Simple', icon: Package, description: 'Version simplifiée' }
       ]
     },
@@ -895,6 +897,16 @@ function App() {
           >
             🔄 Autoencoder Avancé
           </button>
+          <button
+            onClick={() => setTrainingTab('autoattention')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+              trainingTab === 'autoattention'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🔄 Autoattention
+          </button>
         </div>
 
         {/* Description de l'onglet actuel */}
@@ -923,6 +935,14 @@ function App() {
               </p>
             </div>
           )}
+          {trainingTab === 'autoattention' && (
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+              <p className="text-slate-200">
+                <strong>Autoattention:</strong> Implémentation d'une attention automatique pour les séquences.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -931,6 +951,7 @@ function App() {
         {trainingTab === 'bert' && <BERTTraining reviews={reviews} />}
         {trainingTab === 'rnn' && <RNNTraining isVisible={true} />}
         {trainingTab === 'autoencoder' && <AutoencoderTraining />}
+        {trainingTab === 'autoattention' && <AutoAttentionTraining />}
       </div>
     </div>
   );
@@ -1343,16 +1364,16 @@ function App() {
                               </div>
                               
                               {/* Bouton Info */}
-                              <button
+                              <div
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openInfoPopup(item.id);
                                 }}
-                                className="p-2 rounded-lg hover:bg-white/10 transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110"
+                                className="p-2 rounded-lg hover:bg-white/10 transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 cursor-pointer"
                                 title="Plus d'informations"
                               >
                                 <Info className="h-4 w-4 text-white/60 hover:text-blue-400 transition-colors" />
-                              </button>
+                              </div>
                               
                               {/* Indicateur d'activité */}
                               {isActive && (
@@ -1605,6 +1626,7 @@ function App() {
         {currentView === 'explore' && renderExplore()}
         {currentView === 'analyze' && renderAnalyze()}
         {currentView === 'training' && renderTraining()}
+        {currentView === 'auto_attention' && <AutoAttentionTraining />}
         {currentView === 'pipeline' && renderPipeline()}
         {currentView === 'results' && renderResults()}
         {currentView === 'embeddings_hub' && <EmbeddingHub onClose={() => setCurrentView('home')} />}
